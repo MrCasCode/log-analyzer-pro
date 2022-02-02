@@ -59,7 +59,7 @@ impl LogService {
         async_std::task::spawn(async move {
             while let Ok((path, line)) = raw_line_receiver.recv().await {
                 raw_line_log_store.add_line(&path, &line).await;
-                raw_line_format_sender.send((path.clone(), line.clone())).await;
+                raw_line_format_sender.send((path, line)).await;
             }
         });
 
@@ -70,7 +70,7 @@ impl LogService {
             while let Ok((path, line)) = format_line_receiver.recv().await {
                 if let Some(format) = format_line_processing_store.get_format(&path).await {
                     if let Some(line) = apply_format(&format, &line) {
-                        format_line_filter_sender.send((path.clone(), line)).await;
+                        format_line_filter_sender.send((path, line)).await;
                     }
                 }
             }
@@ -85,8 +85,6 @@ impl LogService {
                 if let Some(filtered_line) = apply_filters(&filters, log_line) {
                     let search_query = filter_line_analysis_store.get_search_query().await;
                     filter_line_analysis_store.add_lines(&[&filtered_line]).await;
-
-                    println!(" --> {:?}", filtered_line);
 
                     if search_query.is_some() && apply_search(search_query.unwrap(), &filtered_line) {
                         filter_line_analysis_store
@@ -118,20 +116,14 @@ impl LogAnalyzer for LogService {
         let sender = self.source_channels.0.clone();
         let log_store = self.log_store.clone();
 
-        //std::thread::spawn(move ||
-            {
-            async_std::task::spawn(async move {
-                let log_source = Arc::new(create_source(source_type, source_address.clone()));
-                log_store
-                    .add_log(&source_address, log_source.clone(), true)
-                    .await;
+        async_std::task::spawn(async move {
+            let log_source = Arc::new(create_source(source_type, source_address.clone()));
+            log_store
+                .add_log(&source_address, log_source.clone(), true)
+                .await;
 
-                log_source.run(sender).await.unwrap();
-            });
-        }
-    //);
-
-
+            log_source.run(sender).await.unwrap();
+        });
 
         Some(())
     }

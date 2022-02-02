@@ -1,14 +1,15 @@
 
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use async_std::io::prelude::SeekExt;
+use async_std::io::prelude::{SeekExt, BufReadExt};
 use async_std::{prelude::*, task, channel};
 use async_std::task::JoinHandle;
 use async_std::{fs::File, io::BufReader, io::Seek, io::SeekFrom, stream::Stream};
 //use tokio::sync::{broadcast::Sender};
 use async_std::{prelude::*, channel::Receiver, channel::Sender};
+use futures::{StreamExt};
 
 use crate::models::log::Log;
 
@@ -56,17 +57,13 @@ impl LogSource for FileSource {
             let file = File::open(&self.path).await;
             match file {
                 Ok(f) => {
-                    let reader = BufReader::new(f);
-                    let mut lines = reader.lines();
-                    let mut count = 0;
-                    while let Some(line) = lines.next().await {
-                        if count >= read_lines {
-                            sender.send((self.path.clone(), line?.clone())).await?;
-                        }
-                        count += 1;
-                    }
+                    let reader = BufReader::with_capacity(2_usize.pow(26), f);
 
-                    read_lines = count;
+                    let mut lines = reader.lines().skip(read_lines);
+                    while let Some(line) = lines.next().await {
+                        sender.send((self.path.clone(), line?)).await?;
+                        read_lines += 1;
+                    }
                 },
                 Err(err) => println!("{:?}", err)
             }
