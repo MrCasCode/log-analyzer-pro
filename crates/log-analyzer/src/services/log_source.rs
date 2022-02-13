@@ -25,12 +25,46 @@ pub enum SourceType {
     WS
 }
 
-pub fn create_source(source: SourceType, source_address: String) -> Box<dyn LogSource + Send + Sync> {
-    if source == SourceType::FILE {
-        Box::new(FileSource{path: source_address})
+impl TryFrom<usize> for SourceType {
+    type Error = ();
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(SourceType::FILE),
+            1 => Ok(SourceType::WS),
+            _ => Err(())
+        }
     }
-    else {
-        Box::new(WsSource{address: source_address})
+}
+
+impl Into<usize> for SourceType {
+    fn into(self) -> usize {
+        match self {
+            SourceType::FILE => 0,
+            SourceType::WS => 1,
+        }
+    }
+}
+
+async fn is_file_path_valid(path: &String) -> bool {
+    match File::open(&path).await {
+        Ok(_) => true,
+        Err(_) => false
+    }
+}
+
+
+pub async fn create_source(source: SourceType, source_address: String) -> Result<Box<dyn LogSource + Send + Sync>> {
+    match source {
+        SourceType::FILE => {
+            match is_file_path_valid(&source_address).await {
+                true => Ok(Box::new(FileSource{path: source_address})),
+                false => Err(anyhow!("Could not open file.\nPlease that path is correct"))
+            }
+        },
+        SourceType::WS => {
+            Ok(Box::new(WsSource{address: source_address}))
+        }
     }
 }
 
@@ -45,13 +79,9 @@ pub struct FileSource {
     path: String,
 }
 
-impl FileSource {
-}
-
 #[async_trait]
 impl LogSource for FileSource {
     async fn run(&self, sender: Sender<(String, String)>) -> Result<()> {
-        println!("Run {}", self.path);
         let mut read_lines = 0_usize;
         loop {
             let file = File::open(&self.path).await;
@@ -65,11 +95,11 @@ impl LogSource for FileSource {
                         read_lines += 1;
                     }
                 },
-                Err(err) => println!("{:?}", err)
+                Err(err) => break,
             }
+        };
 
-            async_std::task::sleep(Duration::from_millis(125)).await;
-        }
+        Ok(())
     }
 }
 

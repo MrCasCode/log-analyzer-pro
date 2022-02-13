@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-
-use async_std::{prelude::*, channel, channel::Receiver, channel::Sender};
-
-
+use async_std::{channel, channel::Receiver, channel::Sender, prelude::*};
+use anyhow::{Result, anyhow};
 //use tokio::sync::{broadcast, broadcast::Receiver, broadcast::Sender};
 
 use futures::join;
-
 
 use crate::domain::apply_filters::apply_filters;
 use crate::domain::apply_format::apply_format;
@@ -20,16 +17,21 @@ use crate::stores::processing_store::ProcessingStore;
 
 use super::log_source::{create_source, LogSource, SourceType};
 
-use chrono::prelude::*;
-use std::str::FromStr;
 
+use async_trait::async_trait;
+
+#[async_trait]
 pub trait LogAnalyzer {
-    fn add_log(
+    async fn add_log(
         &mut self,
-        source_type: SourceType,
-        source_address: String,
-        format: Format,
-    ) -> Option<()>;
+        source_type: usize,
+        source_address: &String,
+        format: &String,
+    ) -> Result<()>;
+    async fn add_format(&self, alias: &String, regex: &String) -> Result<()>;
+    async fn get_logs(&self) -> Vec<(bool, String, String)>;
+    async fn get_formats(&self) -> Vec<String>;
+    async fn get_filters(&self) -> Vec<Filter>;
 }
 
 pub struct LogService {
@@ -47,8 +49,6 @@ impl LogService {
         processing_store: Arc<dyn ProcessingStore + Sync + Send>,
         analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
     ) -> Self {
-
-
         let source_channels = channel::unbounded();
         let format_channels = channel::unbounded();
         let filter_channels = channel::unbounded();
@@ -84,9 +84,12 @@ impl LogService {
                 let filters = filter_line_processing_store.get_filters().await;
                 if let Some(filtered_line) = apply_filters(&filters, log_line) {
                     let search_query = filter_line_analysis_store.get_search_query().await;
-                    filter_line_analysis_store.add_lines(&[&filtered_line]).await;
+                    filter_line_analysis_store
+                        .add_lines(&[&filtered_line])
+                        .await;
 
-                    if search_query.is_some() && apply_search(search_query.unwrap(), &filtered_line) {
+                    if search_query.is_some() && apply_search(search_query.unwrap(), &filtered_line)
+                    {
                         filter_line_analysis_store
                             .add_search_lines(&[&filtered_line])
                             .await;
@@ -106,25 +109,46 @@ impl LogService {
     }
 }
 
+#[async_trait]
 impl LogAnalyzer for LogService {
-    fn add_log(
+    async fn add_log(
         &mut self,
-        source_type: SourceType,
-        source_address: String,
-        format: Format,
-    ) -> Option<()> {
+        source_type: usize,
+        source_address: &String,
+        format: &String,
+    ) -> Result<()> {
         let sender = self.source_channels.0.clone();
         let log_store = self.log_store.clone();
 
-        async_std::task::spawn(async move {
-            let log_source = Arc::new(create_source(source_type, source_address.clone()));
-            log_store
-                .add_log(&source_address, log_source.clone(), true)
-                .await;
+        let source_type = SourceType::try_from(source_type).unwrap();
 
+        let log_source = Arc::new(create_source(source_type, source_address.clone()).await?);
+        log_store
+            .add_log(&source_address, log_source.clone(), &format, true)
+            .await;
+
+        async_std::task::spawn(async move {
             log_source.run(sender).await.unwrap();
         });
 
-        Some(())
+        Ok(())
+    }
+
+    async fn add_format(&self, alias: &String, regex: &String) -> Result<()> {
+        let format = Format::new(alias, regex)?;
+        self.processing_store.add_format(format.alias, format.regex).await;
+        Ok(())
+    }
+
+    async fn get_logs(&self) -> Vec<(bool, String, String)> {
+        self.log_store.get_logs().await
+    }
+
+    async fn get_formats(&self) -> Vec<String> {
+        self.processing_store.get_formats().await
+    }
+
+    async fn get_filters(&self) -> Vec<Filter> {
+        self.processing_store.get_filters().await
     }
 }

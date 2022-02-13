@@ -1,12 +1,13 @@
 use crate::models::{filter::{FilterAction, Filter}, log_line::LogLine};
 use async_std::sync::RwLock;
 use async_trait::async_trait;
-use std::{collections::HashMap, iter::FromIterator, sync::Arc};
+use std::{collections::HashMap};
 
 #[async_trait]
 pub trait ProcessingStore {
     async fn add_format(&self, id: String, format: String);
     async fn get_format(&self, id: &String) -> Option<String>;
+    async fn get_formats(&self) -> Vec<String>;
     async fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool);
     async fn get_filters(&self) -> Vec<Filter>;
 }
@@ -41,6 +42,11 @@ impl ProcessingStore for InMemmoryProcessingStore {
         }
     }
 
+    async fn get_formats(&self) -> Vec<String>{
+        let formats_lock = self.formats.read().await;
+        formats_lock.keys().cloned().collect()
+    }
+
     async fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool) {
         let mut w = self.filters.write().await;
         w.insert(id, (action, filter, enabled));
@@ -51,8 +57,8 @@ impl ProcessingStore for InMemmoryProcessingStore {
 
         let filters = r
             .values()
-            .filter(|(action, filter, enabled)| *enabled == true)
-            .map(|(action, filter, enabled)| Filter{ action: action.clone(), filter: filter.clone()})
+            .filter(|(_action, _filter, enabled)| *enabled == true)
+            .map(|(action, filter, _enabled)| Filter{ action: action.clone(), filter: filter.clone()})
             .collect();
 
         filters

@@ -1,16 +1,12 @@
 [package]
-name = "log_analyzer_pro_service"
+name = "log-analyzer"
 version = "0.1.0"
-edition = "2018"
-
-[lib]
-name = "log_analyzer_pro_service"
-crate-type = ["cdylib"]
+edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0.53", features = ["backtrace"] }
 regex = "1.5.4"
-async-std = "1.10.0"
+async-std = { version = "1.10.0", features = ["unstable"]}
 async-trait = "0.1.52"
 futures = "0.3.19"
 chrono = "0.4.19"
