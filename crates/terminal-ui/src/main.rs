@@ -14,7 +14,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log_analyzer::{stores::{log_store::InMemmoryLogStore, processing_store::{InMemmoryProcessingStore, ProcessingStore}, analysis_store::InMemmoryAnalysisStore}, services::log_service::LogService};
+use log_analyzer::{stores::{log_store::InMemmoryLogStore, processing_store::{InMemmoryProcessingStore, ProcessingStore}, analysis_store::InMemmoryAnalysisStore}, services::log_service::LogService, models::settings::Settings};
 
 use std::{
     error::Error,
@@ -22,6 +22,7 @@ use std::{
     io,
     slice::Iter,
     time::{Duration, Instant}, sync::Arc,
+    fs
 };
 use styles::SELECTED_STYLE;
 use tui::{
@@ -51,7 +52,7 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
     // setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -60,13 +61,27 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
     let processing_store = Arc::new(InMemmoryProcessingStore::new());
     let analysis_store = Arc::new(InMemmoryAnalysisStore::new());
 
+    if let Ok(file) = fs::read_to_string("settings.json") {
+        if let Ok(settings) = Settings::from_json(&file) {
+            for format in settings.formats {
+                processing_store.add_format(format.alias, format.regex).await;
+            }
+            for filter in settings.filters {
+                processing_store.add_filter(filter.alias, filter.filter, filter.action, false).await;
+            }
+        }
+
+    }
+
     let log_service = LogService::new(log_store, processing_store, analysis_store);
 
 
+
     // create app and run it
-    let tick_rate = Duration::from_millis(125);
+    let tick_rate = Duration::from_millis(50);
     let app = App::new(Box::new(log_service)).await;
-    let res = run_app(&mut terminal, app, tick_rate);
+    let res = run_app(&mut terminal, app, tick_rate).await;
+
 
     // restore terminal
     disable_raw_mode()?;
@@ -92,12 +107,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
 
-fn run_app<B: Backend>(
+async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     mut app: App,
     tick_rate: Duration,
 ) -> io::Result<()> {
     let mut last_tick = Instant::now();
+
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
 
@@ -145,7 +161,7 @@ fn run_app<B: Backend>(
             }
         }
         if last_tick.elapsed() >= tick_rate {
-            app.on_tick();
+            app.on_tick().await;
             last_tick = Instant::now();
         }
     }

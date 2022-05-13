@@ -1,0 +1,17 @@
+{
+    "formats": [
+        {
+            "alias": "Default",
+            "regex": "(?P<PAYLOAD>.*)"
+        }
+    ],
+    "filters": [
+        {
+            "alias": "Name",
+            "action": "INCLUDE",
+            "filter": {
+                "payload": ".*"
+            }
+        }
+    ]
+}

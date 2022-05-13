@@ -33,10 +33,10 @@ async fn async_main() -> Result<()> {
 
     let mut log_service = LogService::new(log_store, processing_store, analysis_store);
     log_service.add_log(
-        SourceType::FILE,
-        file,
-        Format::new("log".to_string(), "log".to_string()).unwrap(),
-    );
+        SourceType::FILE.into(),
+        &file,
+        &"".to_string(),
+    ).await;
 
     loop {
         async_std::task::sleep(Duration::from_secs(10)).await;

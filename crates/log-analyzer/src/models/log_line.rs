@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct LogLine {
     pub date: String,
     pub timestamp: String,

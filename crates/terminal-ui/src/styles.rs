@@ -1,4 +1,4 @@
-use tui::style::{Style, Modifier, Color};
+use tui::style::{Color, Modifier, Style};
 
 pub const SELECTED_COLOR: Color = Color::LightBlue;
 

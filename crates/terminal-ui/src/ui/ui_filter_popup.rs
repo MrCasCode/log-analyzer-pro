@@ -143,63 +143,63 @@ where
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_NAME - INDEX_FILTER_NAME],
         INDEX_FILTER_NAME,
         "Name",
     );
     draw_filter_type_selector(
         f,
         app,
-        popup_layout[INDEX_FILTER_TYPE],
+        popup_layout[INDEX_FILTER_TYPE - INDEX_FILTER_NAME],
         INDEX_FILTER_TYPE,
         "Type",
     );
     draw_color_selector(
         f,
         app,
-        popup_layout[INDEX_FILTER_COLOR],
+        popup_layout[INDEX_FILTER_COLOR - INDEX_FILTER_NAME],
         INDEX_FILTER_COLOR,
         "Color",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_DATETIME],
+        popup_layout[INDEX_FILTER_DATETIME - INDEX_FILTER_NAME],
         INDEX_FILTER_DATETIME,
         "Datetime",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_TIMESTAMP],
+        popup_layout[INDEX_FILTER_TIMESTAMP - INDEX_FILTER_NAME],
         INDEX_FILTER_TIMESTAMP,
         "Timestamp",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_APP],
+        popup_layout[INDEX_FILTER_APP - INDEX_FILTER_NAME],
         INDEX_FILTER_APP,
         "App",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_SEVERITY],
+        popup_layout[INDEX_FILTER_SEVERITY - INDEX_FILTER_NAME],
         INDEX_FILTER_SEVERITY,
         "Severity",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_FUNCTION],
+        popup_layout[INDEX_FILTER_FUNCTION - INDEX_FILTER_NAME],
         INDEX_FILTER_FUNCTION,
         "Function",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_PAYLOAD],
+        popup_layout[INDEX_FILTER_PAYLOAD - INDEX_FILTER_NAME],
         INDEX_FILTER_PAYLOAD,
         "Payload",
     );

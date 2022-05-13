@@ -58,7 +58,7 @@ impl ProcessingStore for InMemmoryProcessingStore {
         let filters = r
             .values()
             .filter(|(_action, _filter, enabled)| *enabled == true)
-            .map(|(action, filter, _enabled)| Filter{ action: action.clone(), filter: filter.clone()})
+            .map(|(action, filter, _enabled)| Filter{ alias: "".to_string(), action: action.clone(), filter: filter.clone()})
             .collect();
 
         filters

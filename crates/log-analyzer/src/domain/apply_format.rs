@@ -2,6 +2,10 @@ use regex::{Regex, Captures};
 
 use crate::models::log_line::LogLine;
 
+
+
+
+
 pub fn apply_format(format: &String, line: &String) -> Option<LogLine> {
     let re = Regex::new(&format);
     match re {

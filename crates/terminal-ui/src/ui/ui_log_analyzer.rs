@@ -1,3 +1,4 @@
+use log_analyzer::models::log_line::LogLine;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Corner, Direction, Layout, Rect},
@@ -8,7 +9,7 @@ use tui::{
 };
 
 use crate::{
-    app::Module,
+    app::{Module, INDEX_SEARCH, StatefulTable},
     styles::{SELECTED_COLOR, SELECTED_STYLE},
     App,
 };
@@ -34,8 +35,8 @@ where
     let header = Row::new(header_cells)
         .style(normal_style)
         .bottom_margin(1);
-
-    let rows = app.sources.items.iter().map(|item| {
+    let r = app.sources.items.read().unwrap();
+    let rows = r.iter().map(|item| {
         let get_enabled_widget = |enabled: bool| match enabled {
             true => Span::styled("V", Style::default().fg(SELECTED_COLOR)),
             false => Span::styled("X", Style::default().fg(Color::Gray)),
@@ -46,7 +47,7 @@ where
             Cell::from(Text::from(item.1.as_str())),
             Cell::from(Text::from(item.2.as_str())),
         ];
-        Row::new(cells).bottom_margin(1)
+        Row::new(cells).bottom_margin(0)
     });
     let t = Table::new(rows)
         .header(header)
@@ -87,99 +88,77 @@ where
     draw_filters(f, app, left_modules[1]);
 }
 
+
+fn draw_log<B>(f: &mut Frame<B>, is_selected: bool, items: &mut StatefulTable<LogLine>, title: &str, area: Rect)
+where
+    B: Backend,
+{
+    let log_widget = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(match is_selected {
+            true => SELECTED_STYLE,
+            _ => Style::default(),
+        });
+
+    let selected_style = Style::default().add_modifier(Modifier::REVERSED);
+    let normal_style = Style::default().bg(SELECTED_COLOR).add_modifier(Modifier::BOLD);
+
+    let header_cells = ["Payload"]
+        .iter()
+        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Black)));
+    let header = Row::new(header_cells)
+        .style(normal_style)
+        .bottom_margin(1);
+
+
+    let r = items.items.read().unwrap();
+    let rows = r.iter().map(|item| {
+        let cells = vec![
+            Cell::from(Span::styled(&item.payload, Style::default())),
+        ];
+        Row::new(cells).bottom_margin(0)
+    });
+
+    let t = Table::new(rows)
+        .header(header)
+        .block(log_widget)
+        .highlight_style(selected_style)
+        .widths(&[
+            Constraint::Percentage(100),
+        ]);
+    f.render_stateful_widget(t, area, &mut items.state);
+}
+
+fn draw_search_box<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize, title: &str)
+where
+    B: Backend,
+{
+    let input_widget = Paragraph::new(app.input_buffers[index].as_ref())
+        .style(match app.selected_module {
+            Module::Search => SELECTED_STYLE,
+            _ => Style::default(),
+        })
+        .block(Block::default().borders(Borders::ALL).title(title));
+
+    f.render_widget(input_widget, area);
+}
+
+
 fn draw_main_panel<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
 {
     let main_modules = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(75), Constraint::Percentage(25)].as_ref())
+        .constraints([Constraint::Percentage(75), Constraint::Max(3), Constraint::Percentage(15)].as_ref())
         .split(area);
 
-    // Iterate through all elements in the `items` app and append some debug text to it.
-    let items: Vec<ListItem> = app
-        .items
-        .items
-        .iter()
-        .map(|i| {
-            let mut lines = vec![Spans::from(i.0)];
-            ListItem::new(lines).style(Style::default().fg(Color::White))
-        })
-        .collect();
+    draw_log(f, app.selected_module == Module::Logs, &mut app.log_lines, "Log", main_modules[0]);
+    draw_search_box(f, app, main_modules[1], INDEX_SEARCH, "Search");
+    draw_log(f, app.selected_module == Module::SearchResult, &mut app.search_lines, "Search results", main_modules[2]);
 
-    // Create a List from all list items and highlight the currently selected one
-    let items = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Log")
-                .border_style(match app.selected_module {
-                    Module::Logs => SELECTED_STYLE,
-                    _ => Style::default(),
-                }),
-        )
-        .highlight_style(
-            Style::default()
-                .bg(Color::LightGreen)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol(">> ");
 
-    // We can now render the item list
-    f.render_stateful_widget(items, main_modules[0], &mut app.items.state);
-
-    // Let's do the same for the events.
-    // The event list doesn't have any state and only displays the current state of the list.
-    let events: Vec<ListItem> = app
-        .events
-        .iter()
-        .rev()
-        .map(|&(event, level)| {
-            // Colorcode the level depending on its type
-            let s = match level {
-                "CRITICAL" => Style::default().fg(Color::Red),
-                "ERROR" => Style::default().fg(Color::Magenta),
-                "WARNING" => Style::default().fg(Color::Yellow),
-                "INFO" => Style::default().fg(Color::Blue),
-                _ => Style::default(),
-            };
-            // Add a example datetime and apply proper spacing between them
-            let header = Spans::from(vec![
-                Span::styled(format!("{:<9}", level), s),
-                Span::raw(" "),
-                Span::styled(
-                    "2020-01-01 10:00:00",
-                    Style::default().add_modifier(Modifier::ITALIC),
-                ),
-            ]);
-            // The event gets its own line
-            let log = Spans::from(vec![Span::raw(event)]);
-
-            // Here several things happen:
-            // 1. Add a `---` spacing line above the final list entry
-            // 2. Add the Level + datetime
-            // 3. Add a spacer line
-            // 4. Add the actual event
-            ListItem::new(vec![
-                Spans::from("-".repeat(main_modules[1].width as usize)),
-                header,
-                Spans::from(""),
-                log,
-            ])
-        })
-        .collect();
-    let events_list = List::new(events)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Search")
-                .border_style(match app.selected_module {
-                    Module::Search => SELECTED_STYLE,
-                    _ => Style::default(),
-                }),
-        )
-        .start_corner(Corner::BottomLeft);
-    f.render_widget(events_list, main_modules[1]);
 }
 
 pub fn draw_log_analyzer_view<B>(f: &mut Frame<B>, app: &mut App)

@@ -3,14 +3,19 @@ use crossterm::event::{
     self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
     MouseEvent, MouseEventKind,
 };
-use log_analyzer::services::{log_service::LogAnalyzer, log_source::SourceType};
+use log_analyzer::models::log_line::LogLine;
+use log_analyzer::services::{
+    log_service::{Event as LogEvent, LogAnalyzer},
+    log_source::SourceType,
+};
+
 use std::{
     error::Error,
     fmt::{Debug, Display, Formatter},
     future::Future,
     io,
     slice::Iter,
-    sync::{mpsc::channel, WaitTimeoutResult},
+    sync::{mpsc::channel, Arc, RwLock, WaitTimeoutResult},
     task::Poll,
     time::{Duration, Instant},
 };
@@ -26,24 +31,26 @@ use async_std::{
 
 /* ------ NEW SOURCE INDEXES ------- */
 pub const INDEX_SOURCE_TYPE: usize = 0;
-pub const INDEX_SOURCE_PATH: usize = 1;
-pub const INDEX_SOURCE_FORMAT: usize = 2;
-pub const INDEX_SOURCE_NEW_FORMAT_ALIAS: usize = 3;
-pub const INDEX_SOURCE_NEW_FORMAT_REGEX: usize = 4;
-pub const INDEX_SOURCE_OK_BUTTON: usize = 5;
-/* ----------------------------------- */
-
+pub const INDEX_SOURCE_PATH: usize = INDEX_SOURCE_TYPE + 1;
+pub const INDEX_SOURCE_FORMAT: usize = INDEX_SOURCE_PATH + 1;
+pub const INDEX_SOURCE_NEW_FORMAT_ALIAS: usize = INDEX_SOURCE_FORMAT + 1;
+pub const INDEX_SOURCE_NEW_FORMAT_REGEX: usize = INDEX_SOURCE_NEW_FORMAT_ALIAS + 1;
+pub const INDEX_SOURCE_OK_BUTTON: usize = INDEX_SOURCE_NEW_FORMAT_REGEX + 1;
 /* ------ FILTER INDEXES ------- */
-pub const INDEX_FILTER_NAME: usize = 0;
-pub const INDEX_FILTER_TYPE: usize = 1;
-pub const INDEX_FILTER_COLOR: usize = 2;
-pub const INDEX_FILTER_DATETIME: usize = 3;
-pub const INDEX_FILTER_TIMESTAMP: usize = 4;
-pub const INDEX_FILTER_APP: usize = 5;
-pub const INDEX_FILTER_SEVERITY: usize = 6;
-pub const INDEX_FILTER_FUNCTION: usize = 7;
-pub const INDEX_FILTER_PAYLOAD: usize = 8;
-pub const INDEX_FILTER_OK_BUTTON: usize = 9;
+pub const INDEX_FILTER_NAME: usize = INDEX_SOURCE_OK_BUTTON + 1;
+pub const INDEX_FILTER_TYPE: usize = INDEX_FILTER_NAME + 1;
+pub const INDEX_FILTER_COLOR: usize = INDEX_FILTER_TYPE + 1;
+pub const INDEX_FILTER_DATETIME: usize = INDEX_FILTER_COLOR + 1;
+pub const INDEX_FILTER_TIMESTAMP: usize = INDEX_FILTER_DATETIME + 1;
+pub const INDEX_FILTER_APP: usize = INDEX_FILTER_TIMESTAMP + 1;
+pub const INDEX_FILTER_SEVERITY: usize = INDEX_FILTER_APP + 1;
+pub const INDEX_FILTER_FUNCTION: usize = INDEX_FILTER_SEVERITY + 1;
+pub const INDEX_FILTER_PAYLOAD: usize = INDEX_FILTER_FUNCTION + 1;
+pub const INDEX_FILTER_OK_BUTTON: usize = INDEX_FILTER_PAYLOAD + 1;
+/* ------ SEARCH INDEXES ------- */
+pub const INDEX_SEARCH: usize = INDEX_FILTER_OK_BUTTON + 1;
+/* ----------------------------------- */
+pub const INDEX_MAX: usize = INDEX_SEARCH + 1;
 /* ----------------------------------- */
 
 pub struct PopupInteraction {
@@ -58,6 +65,7 @@ pub enum Module {
     Filters,
     Logs,
     Search,
+    SearchResult,
     SourcePopup,
     FilterPopup,
     ErrorPopup,
@@ -97,11 +105,11 @@ impl ScrollDirection {
 
 pub struct StatefulTable<T> {
     pub state: TableState,
-    pub items: Vec<T>,
+    pub items: Arc<RwLock<Vec<T>>>,
 }
 
 impl<T> StatefulTable<T> {
-    fn with_items(items: Vec<T>) -> StatefulTable<T> {
+    fn with_items(items: Arc<RwLock<Vec<T>>>) -> StatefulTable<T> {
         StatefulTable {
             state: TableState::default(),
             items,
@@ -109,31 +117,35 @@ impl<T> StatefulTable<T> {
     }
 
     fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.items.len() - 1 {
-                    0
-                } else {
-                    i + 1
+        if self.items.read().unwrap().len() > 0 {
+            let i = match self.state.selected() {
+                Some(i) => {
+                    if i >= self.items.read().unwrap().len() - 1 {
+                        0
+                    } else {
+                        i + 1
+                    }
                 }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
+                None => 0,
+            };
+            self.state.select(Some(i));
+        }
     }
 
     fn previous(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.items.len() - 1
-                } else {
-                    i - 1
+        if self.items.read().unwrap().len() > 0 {
+            let i = match self.state.selected() {
+                Some(i) => {
+                    if i == 0 {
+                        self.items.read().unwrap().len() - 1
+                    } else {
+                        i - 1
+                    }
                 }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
+                None => 0,
+            };
+            self.state.select(Some(i));
+        }
     }
 
     fn unselect(&mut self) {
@@ -193,7 +205,7 @@ impl<T> StatefulList<T> {
 ///
 /// Check the event handling at the bottom to see how to change the state on incoming events.
 /// Check the drawing logic for items on how to specify the highlighting style for selected items.
-pub struct App<'a> {
+pub struct App {
     pub log_analyzer: Box<dyn LogAnalyzer>,
 
     pub selected_module: Module,
@@ -216,22 +228,22 @@ pub struct App<'a> {
     // Display all log sources in the sources panel
     pub sources: StatefulTable<(bool, String, String)>,
 
-    pub items: StatefulList<(&'a str, usize)>,
-    pub events: Vec<(&'a str, &'a str)>,
+    pub log_lines: StatefulTable<LogLine>,
+    pub search_lines: StatefulTable<LogLine>,
 
     pub show_error_message: bool,
 
     pub popup: PopupInteraction,
 }
 
-impl<'a> App<'a> {
-    pub async fn new(log_analyzer: Box<dyn LogAnalyzer>) -> App<'a> {
-        let items = vec![("Item0", 1); 50];
-
+impl App {
+    pub async fn new(log_analyzer: Box<dyn LogAnalyzer>) -> App {
         let mut formats = vec!["New".to_string()];
         formats.extend(log_analyzer.get_formats().await);
 
-        let sources = log_analyzer.get_logs().await;
+        let sources = Arc::new(RwLock::new(log_analyzer.get_logs()));
+        let log_lines = log_analyzer.get_log();
+        let search_lines = log_analyzer.get_search();
 
         App {
             log_analyzer,
@@ -240,7 +252,7 @@ impl<'a> App<'a> {
             show_source_popup: false,
             show_filter_popup: false,
 
-            input_buffers: vec![String::new(); 20],
+            input_buffers: vec![String::new(); INDEX_MAX],
             input_buffer_index: 0,
 
             formats: StatefulList::with_items(formats),
@@ -251,35 +263,9 @@ impl<'a> App<'a> {
 
             sources: StatefulTable::with_items(sources),
 
-            items: StatefulList::with_items(items),
-            events: vec![
-                ("Event1", "INFO"),
-                ("Event2", "INFO"),
-                ("Event3", "CRITICAL"),
-                ("Event4", "ERROR"),
-                ("Event5", "INFO"),
-                ("Event6", "INFO"),
-                ("Event7", "WARNING"),
-                ("Event8", "INFO"),
-                ("Event9", "INFO"),
-                ("Event10", "INFO"),
-                ("Event11", "CRITICAL"),
-                ("Event12", "INFO"),
-                ("Event13", "INFO"),
-                ("Event14", "INFO"),
-                ("Event15", "INFO"),
-                ("Event16", "INFO"),
-                ("Event17", "ERROR"),
-                ("Event18", "ERROR"),
-                ("Event19", "INFO"),
-                ("Event20", "INFO"),
-                ("Event21", "WARNING"),
-                ("Event22", "INFO"),
-                ("Event23", "INFO"),
-                ("Event24", "WARNING"),
-                ("Event25", "INFO"),
-                ("Event26", "INFO"),
-            ],
+            log_lines: StatefulTable::with_items(log_lines),
+            search_lines: StatefulTable::with_items(search_lines),
+
             show_error_message: false,
             popup: PopupInteraction {
                 response: true,
@@ -321,23 +307,36 @@ impl<'a> App<'a> {
     }
 
     pub async fn update_sources(&mut self) {
-        let sources = self.log_analyzer.get_logs().await;
-        self.sources = StatefulTable::with_items(sources)
+        let sources = self.log_analyzer.get_logs();
+        self.sources = StatefulTable::with_items( Arc::new(RwLock::new(sources)))
+    }
+
+    async fn on_event(&mut self) {
+        let receiver = self.log_analyzer.on_event();
+        let mut events = Vec::new();
+
+        while let Ok(evt) = receiver.try_recv() {
+            events.push(evt);
+        }
+
+        if events.contains(&LogEvent::NewLine) {}
+
+        if events.contains(&LogEvent::NewSearchLine) {}
     }
 
     /// Rotate through the event list.
     /// This only exists to simulate some kind of "progress"
-    pub fn on_tick(&mut self) {
-        let event = self.events.remove(0);
-        self.events.push(event);
+    pub async fn on_tick(&mut self) {
+        self.on_event().await;
     }
 
     pub async fn handle_input(&mut self, key: KeyEvent) {
         match self.selected_module {
             Module::Sources => self.handle_sources_input(key).await,
             Module::Filters => self.handle_filters_input(key).await,
-            Module::Logs => self.handle_sources_input(key).await,
-            Module::Search => self.handle_sources_input(key).await,
+            Module::Logs => self.handle_log_input(key).await,
+            Module::Search => self.handle_search_input(key).await,
+            Module::SearchResult => self.handle_search_result_input(key).await,
             Module::SourcePopup => self.handle_source_popup_input(key).await,
             Module::FilterPopup => self.handle_filter_popup_input(key).await,
             Module::ErrorPopup => self.handle_error_popup_input(key).await,
@@ -348,9 +347,13 @@ impl<'a> App<'a> {
     async fn handle_sources_input(&mut self, key: KeyEvent) {
         match key.code {
             // Navigate up sources
-            KeyCode::Up => {}
+            KeyCode::Up => {
+                self.sources.previous();
+            }
             // Navigate down sources
-            KeyCode::Down => {}
+            KeyCode::Down => {
+                self.sources.next();
+            }
             // Toggle enabled/disabled source
             KeyCode::Enter => {}
             // Add new source -> Popup window
@@ -362,6 +365,31 @@ impl<'a> App<'a> {
             }
             // Delete source
             KeyCode::Char('-') | KeyCode::Char('d') | KeyCode::Delete | KeyCode::Backspace => {}
+            // Nothing
+            _ => {}
+        }
+    }
+
+    async fn handle_log_input(&mut self, key: KeyEvent) {
+        handle_table_input(&mut self.log_lines, key).await;
+    }
+
+    async fn handle_search_result_input(&mut self, key: KeyEvent) {
+        handle_table_input(&mut self.search_lines, key).await;
+    }
+
+    async fn handle_search_input(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char(c) => {
+                self.input_buffers[INDEX_SEARCH].push(c);
+            }
+            KeyCode::Enter => {
+                self.log_analyzer
+                    .add_search(&self.input_buffers[INDEX_SEARCH]);
+            }
+            KeyCode::Backspace => {
+                self.input_buffers[INDEX_SEARCH].pop();
+            }
             // Nothing
             _ => {}
         }
@@ -403,7 +431,7 @@ impl<'a> App<'a> {
                         Ok(_) => {
                             self.show_source_popup = false;
                             self.selected_module = Module::Sources;
-                            self.update_sources().await
+                            self.update_sources().await;
                         }
                         Err(err) => {
                             self.selected_module = Module::ErrorPopup;
@@ -516,7 +544,8 @@ impl<'a> App<'a> {
                 _ => {}
             },
             Module::Logs => match direction {
-                KeyCode::Up | KeyCode::Down => self.selected_module = Module::Search,
+                KeyCode::Up => self.selected_module = Module::SearchResult,
+                KeyCode::Down => self.selected_module = Module::Search,
                 KeyCode::Left | KeyCode::Right => {
                     if self.show_side_panel {
                         self.selected_module = Module::Sources
@@ -525,7 +554,18 @@ impl<'a> App<'a> {
                 _ => {}
             },
             Module::Search => match direction {
-                KeyCode::Up | KeyCode::Down => self.selected_module = Module::Logs,
+                KeyCode::Up => self.selected_module = Module::Logs,
+                KeyCode::Down => self.selected_module = Module::SearchResult,
+                KeyCode::Left | KeyCode::Right => {
+                    if self.show_side_panel {
+                        self.selected_module = Module::Filters
+                    }
+                }
+                _ => {}
+            },
+            Module::SearchResult => match direction {
+                KeyCode::Up => self.selected_module = Module::Search,
+                KeyCode::Down => self.selected_module = Module::Logs,
                 KeyCode::Left | KeyCode::Right => {
                     if self.show_side_panel {
                         self.selected_module = Module::Filters
@@ -570,5 +610,45 @@ impl<'a> App<'a> {
             Module::ErrorPopup => (),
             Module::None => self.selected_module = Module::Logs,
         }
+    }
+}
+
+async fn handle_table_input<T>(table: &mut StatefulTable<T>, key: KeyEvent) {
+    let multiplier = if key.modifiers == KeyModifiers::ALT {
+        10
+    } else {
+        1
+    };
+    match key.code {
+        // Navigate up log_lines
+        KeyCode::Up => {
+            let steps = 1 * multiplier;
+            for _ in 0..steps {
+                table.previous();
+            }
+        }
+        // Navigate down log_lines
+        KeyCode::Down => {
+            let steps = 1 * multiplier;
+            for _ in 0..steps {
+                table.next();
+            }
+        }
+        // Navigate up log_lines
+        KeyCode::PageUp => {
+            let steps = 100 * multiplier;
+            for _ in 0..steps {
+                table.previous();
+            }
+        }
+        // Navigate down log_lines
+        KeyCode::PageDown => {
+            let steps = 100 * multiplier;
+            for _ in 0..steps {
+                table.next();
+            }
+        }
+        // Nothing
+        _ => {}
     }
 }
