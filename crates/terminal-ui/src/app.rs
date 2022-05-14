@@ -3,6 +3,7 @@ use crossterm::event::{
     self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
     MouseEvent, MouseEventKind,
 };
+use log_analyzer::models::format::Format;
 use log_analyzer::models::log_line::LogLine;
 use log_analyzer::services::{
     log_service::{Event as LogEvent, LogAnalyzer},
@@ -166,7 +167,7 @@ impl<T> StatefulList<T> {
         }
     }
 
-    fn next(&mut self) {
+    fn next(&mut self) -> usize {
         let i = match self.state.selected() {
             Some(i) => {
                 if i >= self.items.len() - 1 {
@@ -178,9 +179,10 @@ impl<T> StatefulList<T> {
             None => 0,
         };
         self.state.select(Some(i));
+        i
     }
 
-    fn previous(&mut self) {
+    fn previous(&mut self) -> usize{
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -192,6 +194,7 @@ impl<T> StatefulList<T> {
             None => 0,
         };
         self.state.select(Some(i));
+        i
     }
 
     fn unselect(&mut self) {
@@ -239,7 +242,7 @@ pub struct App {
 impl App {
     pub async fn new(log_analyzer: Box<dyn LogAnalyzer>) -> App {
         let mut formats = vec!["New".to_string()];
-        formats.extend(log_analyzer.get_formats().await);
+        formats.extend(log_analyzer.get_formats().into_iter().map(|format| format.alias));
 
         let sources = Arc::new(RwLock::new(log_analyzer.get_logs()));
         let log_lines = log_analyzer.get_log();
@@ -300,7 +303,7 @@ impl App {
 
     pub async fn update_formats(&mut self) {
         let mut formats = vec!["New".to_string()];
-        formats.extend(self.log_analyzer.get_formats().await);
+        formats.extend(self.log_analyzer.get_formats().into_iter().map(|format| format.alias));
 
         self.formats = StatefulList::with_items(formats);
         self.formats.state.select(Some(0));
@@ -396,6 +399,21 @@ impl App {
     }
 
     async fn handle_source_popup_input(&mut self, key: KeyEvent) {
+        let mut fill_format = |i: usize, current_format: &str, | {
+            match current_format {
+                "New" => {
+                    self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].clear();
+                    self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].clear();
+
+                }
+                alias => {
+                    let format = self.log_analyzer.get_formats().iter().filter(|format| format.alias == alias).next().unwrap().clone();
+                    self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS] = format.alias;
+                    self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX] = format.regex;
+                }
+            }
+        };
+
         match key.code {
             KeyCode::Char(c) => {
                 self.input_buffers[self.input_buffer_index].push(c);
@@ -410,13 +428,15 @@ impl App {
             // Navigate up sources
             KeyCode::Up => {
                 if self.input_buffer_index == INDEX_SOURCE_FORMAT {
-                    self.formats.previous();
+                    let i = self.formats.previous();
+                    fill_format(i, self.formats.items[i].as_str());
                 }
             }
             // Navigate down sources
             KeyCode::Down => {
                 if self.input_buffer_index == INDEX_SOURCE_FORMAT {
-                    self.formats.next();
+                    let i = self.formats.next();
+                    fill_format(i, self.formats.items[i].as_str());
                 }
             }
             // Switch between file and ws

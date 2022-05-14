@@ -64,10 +64,10 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
     if let Ok(file) = fs::read_to_string("settings.json") {
         if let Ok(settings) = Settings::from_json(&file) {
             for format in settings.formats {
-                processing_store.add_format(format.alias, format.regex).await;
+                processing_store.add_format(format.alias, format.regex);
             }
             for filter in settings.filters {
-                processing_store.add_filter(filter.alias, filter.filter, filter.action, false).await;
+                processing_store.add_filter(filter.alias, filter.filter, filter.action, false);
             }
         }
 

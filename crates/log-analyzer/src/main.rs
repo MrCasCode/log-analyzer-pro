@@ -29,7 +29,7 @@ async fn async_main() -> Result<()> {
     let processing_store = Arc::new(InMemmoryProcessingStore::new());
     let analysis_store = Arc::new(InMemmoryAnalysisStore::new());
 
-    processing_store.add_format(file.clone(), r"(?P<PAYLOAD>.*)".to_string()).await;
+    processing_store.add_format(file.clone(), r"(?P<PAYLOAD>.*)".to_string());
 
     let mut log_service = LogService::new(log_store, processing_store, analysis_store);
     log_service.add_log(

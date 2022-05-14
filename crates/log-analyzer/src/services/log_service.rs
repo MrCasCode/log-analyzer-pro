@@ -39,8 +39,8 @@ pub trait LogAnalyzer {
     fn get_log(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_logs(&self) -> Vec<(bool, String, String)>;
-    async fn get_formats(&self) -> Vec<String>;
-    async fn get_filters(&self) -> Vec<Filter>;
+    fn get_formats(&self) -> Vec<Format>;
+    fn get_filters(&self) -> Vec<Filter>;
     fn on_event(&self) -> Receiver<Event>;
 }
 
@@ -85,7 +85,7 @@ impl LogService {
         std::thread::spawn(|| {
             async_std::task::spawn(async move {
                 while let Ok((path, line)) = format_line_receiver.recv().await {
-                    if let Some(format) = format_line_processing_store.get_format(&path).await {
+                    if let Some(format) = format_line_processing_store.get_format(&path) {
                         if let Some(line) = apply_format(&format, &line) {
                             format_line_filter_sender.send((path, line)).await;
                         }
@@ -102,7 +102,7 @@ impl LogService {
         std::thread::spawn(|| {
             async_std::task::spawn(async move {
                 while let Ok((_path, log_line)) = filter_line_receiver.recv().await {
-                    let filters = filter_line_processing_store.get_filters().await;
+                    let filters = filter_line_processing_store.get_filters();
                     if let Some(filtered_line) = apply_filters(&filters, log_line) {
                         let search_query = filter_line_analysis_store.get_search_query();
                         filter_line_analysis_store.add_lines(&[&filtered_line]);
@@ -159,8 +159,7 @@ impl LogAnalyzer for LogService {
     async fn add_format(&self, alias: &String, regex: &String) -> Result<()> {
         let format = Format::new(alias, regex)?;
         self.processing_store
-            .add_format(format.alias, format.regex)
-            .await;
+            .add_format(format.alias, format.regex);
         Ok(())
     }
 
@@ -200,12 +199,12 @@ impl LogAnalyzer for LogService {
         self.log_store.get_logs()
     }
 
-    async fn get_formats(&self) -> Vec<String> {
-        self.processing_store.get_formats().await
+    fn get_formats(&self) -> Vec<Format> {
+        self.processing_store.get_formats()
     }
 
-    async fn get_filters(&self) -> Vec<Filter> {
-        self.processing_store.get_filters().await
+    fn get_filters(&self) -> Vec<Filter> {
+        self.processing_store.get_filters()
     }
 
     fn on_event(&self) -> Receiver<Event> {

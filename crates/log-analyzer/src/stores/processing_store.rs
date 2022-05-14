@@ -1,15 +1,18 @@
-use crate::models::{filter::{FilterAction, Filter}, log_line::LogLine};
-use async_std::sync::RwLock;
-use async_trait::async_trait;
-use std::{collections::HashMap};
+use crate::models::{
+    filter::{Filter, FilterAction},
+    format::Format,
+    log_line::LogLine,
+};
+use std::sync::RwLock;
 
-#[async_trait]
+use std::collections::HashMap;
+
 pub trait ProcessingStore {
-    async fn add_format(&self, id: String, format: String);
-    async fn get_format(&self, id: &String) -> Option<String>;
-    async fn get_formats(&self) -> Vec<String>;
-    async fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool);
-    async fn get_filters(&self) -> Vec<Filter>;
+    fn add_format(&self, id: String, format: String);
+    fn get_format(&self, id: &String) -> Option<String>;
+    fn get_formats(&self) -> Vec<Format>;
+    fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool);
+    fn get_filters(&self) -> Vec<Filter>;
 }
 pub struct InMemmoryProcessingStore {
     /// Map of <alias, Regex string>
@@ -27,38 +30,47 @@ impl InMemmoryProcessingStore {
     }
 }
 
-#[async_trait]
 impl ProcessingStore for InMemmoryProcessingStore {
-    async fn add_format(&self, id: String, format: String) {
-        let mut w = self.formats.write().await;
+    fn add_format(&self, id: String, format: String) {
+        let mut w = self.formats.write().unwrap();
         w.insert(id, format);
     }
 
-    async fn get_format(&self, id: &String) -> Option<String> {
-        let r = self.formats.read().await;
+    fn get_format(&self, id: &String) -> Option<String> {
+        let r = self.formats.read().unwrap();
         match r.get(id) {
             Some(format) => Some(format.clone()),
             _ => None,
         }
     }
 
-    async fn get_formats(&self) -> Vec<String>{
-        let formats_lock = self.formats.read().await;
-        formats_lock.keys().cloned().collect()
+    fn get_formats(&self) -> Vec<Format> {
+        let formats_lock = self.formats.read().unwrap();
+        formats_lock
+            .iter()
+            .map(|(alias, regex)| Format {
+                alias: alias.clone(),
+                regex: regex.clone(),
+            })
+            .collect()
     }
 
-    async fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool) {
-        let mut w = self.filters.write().await;
+    fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool) {
+        let mut w = self.filters.write().unwrap();
         w.insert(id, (action, filter, enabled));
     }
 
-    async fn get_filters(&self) -> Vec<Filter> {
-        let r = self.filters.read().await;
+    fn get_filters(&self) -> Vec<Filter> {
+        let r = self.filters.read().unwrap();
 
         let filters = r
             .values()
             .filter(|(_action, _filter, enabled)| *enabled == true)
-            .map(|(action, filter, _enabled)| Filter{ alias: "".to_string(), action: action.clone(), filter: filter.clone()})
+            .map(|(action, filter, _enabled)| Filter {
+                alias: "".to_string(),
+                action: action.clone(),
+                filter: filter.clone(),
+            })
             .collect();
 
         filters
