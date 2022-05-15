@@ -18,13 +18,13 @@ use tui::{
     Frame, Terminal,
 };
 
-use super::ui_popup::centered_rect;
+use super::{ui_popup::centered_rect, ui_shared::display_cursor};
 
 fn draw_input_field<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize, title: &str)
 where
     B: Backend,
 {
-    let input_widget = Paragraph::new(app.input_buffers[index].as_ref())
+    let input_widget = Paragraph::new(app.input_buffers[index].value())
         .style(match index == app.input_buffer_index {
             false => Style::default(),
             true => SELECTED_STYLE,
@@ -32,6 +32,9 @@ where
         .block(Block::default().borders(Borders::ALL).title(title));
 
     f.render_widget(input_widget, area);
+    if index == app.input_buffer_index {
+        display_cursor(f, area, app.input_buffers[index].cursor())
+    }
 }
 
 fn draw_filter_type_selector<B>(

@@ -30,6 +30,9 @@ use async_std::{
     sync::Condvar,
 };
 
+use tui_input::backend::crossterm as input_backend;
+use tui_input::{Input, InputResponse};
+
 /* ------ NEW SOURCE INDEXES ------- */
 pub const INDEX_SOURCE_TYPE: usize = 0;
 pub const INDEX_SOURCE_PATH: usize = INDEX_SOURCE_TYPE + 1;
@@ -182,7 +185,7 @@ impl<T> StatefulList<T> {
         i
     }
 
-    fn previous(&mut self) -> usize{
+    fn previous(&mut self) -> usize {
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -217,7 +220,7 @@ pub struct App {
     pub show_source_popup: bool,
     pub show_filter_popup: bool,
 
-    pub input_buffers: Vec<String>,
+    pub input_buffers: Vec<Input>,
     pub input_buffer_index: usize,
     pub formats: StatefulList<String>,
 
@@ -242,7 +245,12 @@ pub struct App {
 impl App {
     pub async fn new(log_analyzer: Box<dyn LogAnalyzer>) -> App {
         let mut formats = vec!["New".to_string()];
-        formats.extend(log_analyzer.get_formats().into_iter().map(|format| format.alias));
+        formats.extend(
+            log_analyzer
+                .get_formats()
+                .into_iter()
+                .map(|format| format.alias),
+        );
 
         let sources = Arc::new(RwLock::new(log_analyzer.get_logs()));
         let log_lines = log_analyzer.get_log();
@@ -255,7 +263,7 @@ impl App {
             show_source_popup: false,
             show_filter_popup: false,
 
-            input_buffers: vec![String::new(); INDEX_MAX],
+            input_buffers: vec![Input::default(); INDEX_MAX],
             input_buffer_index: 0,
 
             formats: StatefulList::with_items(formats),
@@ -284,8 +292,12 @@ impl App {
         let alias: String;
         // New
         if selected_format_index == 0 {
-            alias = self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].clone();
-            let regex = self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].clone();
+            alias = self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS]
+                .value()
+                .to_string();
+            let regex = self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX]
+                .value()
+                .to_string();
 
             self.log_analyzer.add_format(&alias, &regex).await?;
             self.update_formats().await;
@@ -293,7 +305,7 @@ impl App {
             alias = self.formats.items[selected_format_index].clone();
         }
 
-        let path = self.input_buffers[INDEX_SOURCE_PATH].clone();
+        let path = self.input_buffers[INDEX_SOURCE_PATH].value().to_string();
         self.log_analyzer
             .add_log(self.source_type, &path, &alias)
             .await?;
@@ -303,7 +315,12 @@ impl App {
 
     pub async fn update_formats(&mut self) {
         let mut formats = vec!["New".to_string()];
-        formats.extend(self.log_analyzer.get_formats().into_iter().map(|format| format.alias));
+        formats.extend(
+            self.log_analyzer
+                .get_formats()
+                .into_iter()
+                .map(|format| format.alias),
+        );
 
         self.formats = StatefulList::with_items(formats);
         self.formats.state.select(Some(0));
@@ -311,7 +328,7 @@ impl App {
 
     pub async fn update_sources(&mut self) {
         let sources = self.log_analyzer.get_logs();
-        self.sources = StatefulTable::with_items( Arc::new(RwLock::new(sources)))
+        self.sources = StatefulTable::with_items(Arc::new(RwLock::new(sources)))
     }
 
     async fn on_event(&mut self) {
@@ -383,138 +400,134 @@ impl App {
 
     async fn handle_search_input(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Char(c) => {
-                self.input_buffers[INDEX_SEARCH].push(c);
-            }
             KeyCode::Enter => {
                 self.log_analyzer
-                    .add_search(&self.input_buffers[INDEX_SEARCH]);
+                    .add_search(&self.input_buffers[INDEX_SEARCH].value().into());
+
+            },
+            _ => {
+                let response = input_backend::to_input_request(Event::Key(key))
+                .and_then(|req| Some(self.input_buffers[INDEX_SEARCH].handle(req)));
+
             }
-            KeyCode::Backspace => {
-                self.input_buffers[INDEX_SEARCH].pop();
-            }
-            // Nothing
-            _ => {}
         }
     }
 
     async fn handle_source_popup_input(&mut self, key: KeyEvent) {
-        let mut fill_format = |i: usize, current_format: &str, | {
-            match current_format {
-                "New" => {
-                    self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].clear();
-                    self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].clear();
-
-                }
-                alias => {
-                    let format = self.log_analyzer.get_formats().iter().filter(|format| format.alias == alias).next().unwrap().clone();
-                    self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS] = format.alias;
-                    self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX] = format.regex;
-                }
+        let mut fill_format = |i: usize, current_format: &str| match current_format {
+            "New" => {
+                self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS] = Input::default();
+                self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX] = Input::default();
+            }
+            alias => {
+                let format = self
+                    .log_analyzer
+                    .get_formats()
+                    .iter()
+                    .filter(|format| format.alias == alias)
+                    .next()
+                    .unwrap()
+                    .clone();
+                self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS] =
+                    Input::default().with_value(format.alias);
+                self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX] =
+                    Input::default().with_value(format.regex);
             }
         };
+        // Add new source -> Popup window
+        if key.code == KeyCode::Esc {
+            self.show_source_popup = false;
+            self.selected_module = Module::Sources;
+            return ();
+        }
 
-        match key.code {
-            KeyCode::Char(c) => {
-                self.input_buffers[self.input_buffer_index].push(c);
-            }
-            KeyCode::Backspace => {
-                if self.input_buffer_index == INDEX_SOURCE_FORMAT {
-                    // TODO: Delete format
-                }
-                self.input_buffers[self.input_buffer_index].pop();
-            }
-
-            // Navigate up sources
-            KeyCode::Up => {
-                if self.input_buffer_index == INDEX_SOURCE_FORMAT {
-                    let i = self.formats.previous();
-                    fill_format(i, self.formats.items[i].as_str());
-                }
-            }
-            // Navigate down sources
-            KeyCode::Down => {
-                if self.input_buffer_index == INDEX_SOURCE_FORMAT {
-                    let i = self.formats.next();
-                    fill_format(i, self.formats.items[i].as_str());
-                }
-            }
-            // Switch between file and ws
-            KeyCode::Right | KeyCode::Left => {
-                if self.input_buffer_index == INDEX_SOURCE_TYPE {
+        match self.input_buffer_index {
+            INDEX_SOURCE_TYPE => {
+                // Switch between file and ws
+                if key.code == KeyCode::Right || key.code == KeyCode::Left {
                     self.source_type = !self.source_type & 1;
                 }
             }
-            KeyCode::Enter => {
-                if self.input_buffer_index == INDEX_SOURCE_OK_BUTTON {
-                    match self.add_log().await {
-                        Ok(_) => {
-                            self.show_source_popup = false;
-                            self.selected_module = Module::Sources;
-                            self.update_sources().await;
-                        }
-                        Err(err) => {
-                            self.selected_module = Module::ErrorPopup;
-                            self.show_error_message = true;
-                            self.popup.message = format!("{:?}", err);
-                            self.popup.calling_module = Module::SourcePopup;
+            INDEX_SOURCE_FORMAT => match key.code {
+                // Navigate up sources
+                KeyCode::Up => {
+                    if self.input_buffer_index == INDEX_SOURCE_FORMAT {
+                        let i = self.formats.previous();
+                        fill_format(i, self.formats.items[i].as_str());
+                    }
+                }
+                // Navigate down sources
+                KeyCode::Down => {
+                    if self.input_buffer_index == INDEX_SOURCE_FORMAT {
+                        let i = self.formats.next();
+                        fill_format(i, self.formats.items[i].as_str());
+                    }
+                }
+                _ => {}
+            },
+            index @ (INDEX_SOURCE_PATH
+            | INDEX_SOURCE_NEW_FORMAT_ALIAS
+            | INDEX_SOURCE_NEW_FORMAT_REGEX) => {
+                input_backend::to_input_request(Event::Key(key))
+                    .and_then(|req| Some(self.input_buffers[index].handle(req)));
+                ()
+            }
+            INDEX_SOURCE_OK_BUTTON => {
+                if key.code == KeyCode::Enter {
+                    if self.input_buffer_index == INDEX_SOURCE_OK_BUTTON {
+                        match self.add_log().await {
+                            Ok(_) => {
+                                self.show_source_popup = false;
+                                self.selected_module = Module::Sources;
+                                self.update_sources().await;
+                            }
+                            Err(err) => {
+                                self.selected_module = Module::ErrorPopup;
+                                self.show_error_message = true;
+                                self.popup.message = format!("{:?}", err);
+                                self.popup.calling_module = Module::SourcePopup;
+                            }
                         }
                     }
                 }
             }
-            // Add new source -> Popup window
-            KeyCode::Esc => {
-                self.show_source_popup = false;
-                self.selected_module = Module::Sources;
-            }
-            // Nothing
             _ => {}
         }
     }
 
     async fn handle_filter_popup_input(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Char(c) => {
-                self.input_buffers[self.input_buffer_index].push(c);
+        match self.input_buffer_index {
+            index @ (INDEX_FILTER_NAME
+            | INDEX_FILTER_DATETIME
+            | INDEX_FILTER_TIMESTAMP
+            | INDEX_FILTER_APP
+            | INDEX_FILTER_SEVERITY
+            | INDEX_FILTER_FUNCTION
+            | INDEX_FILTER_PAYLOAD) => {
+                input_backend::to_input_request(Event::Key(key))
+                    .and_then(|req| Some(self.input_buffers[index].handle(req)));
+                ()
             }
-            KeyCode::Backspace => {
-                self.input_buffers[self.input_buffer_index].pop();
-            }
+            index @ (INDEX_FILTER_TYPE | INDEX_FILTER_COLOR) => {
+                // Switch tabs
+                if key.code == KeyCode::Right || key.code == KeyCode::Left {
+                    let circular_choice = |i: &mut usize, max, add: i32| {
+                        *i = match (*i as i32 + add) as i32 {
+                            r if r > max => 0 as usize, // if adding overflows -> set to 0
+                            r if r < 0 => max as usize, // if adding underflows -> set to 0
+                            r => r as usize,
+                        }
+                    };
 
-            KeyCode::Up => {}
-
-            KeyCode::Down => {}
-
-            // Switch tabs
-            KeyCode::Right | KeyCode::Left => {
-                let circular_choice = |i: &mut usize, max, add: i32| {
-                    *i = match (*i as i32 + add) as i32 {
-                        r if r > max => 0 as usize, // if adding overflows -> set to 0
-                        r if r < 0 => max as usize, // if adding underflows -> set to 0
-                        r => r as usize,
+                    let sum = if key.code == KeyCode::Right { 1 } else { -1 };
+                    match self.input_buffer_index {
+                        INDEX_FILTER_TYPE => circular_choice(&mut self.filter_type, 2, sum),
+                        INDEX_FILTER_COLOR => circular_choice(&mut self.filter_color, 14, sum),
+                        _ => {}
                     }
-                };
-
-                let sum = if key.code == KeyCode::Right { 1 } else { -1 };
-                match self.input_buffer_index {
-                    INDEX_FILTER_TYPE => circular_choice(&mut self.filter_type, 2, sum),
-                    INDEX_FILTER_COLOR => circular_choice(&mut self.filter_color, 14, sum),
-                    _ => {}
                 }
             }
-            KeyCode::Enter => {
-                if self.input_buffer_index == INDEX_SOURCE_OK_BUTTON {
-                    // TODO: Validate args and show error message if error
-                    // TODO: Add format if new
-                    // TODO: Add log
-                }
-            }
-            // Add new source -> Popup window
-            KeyCode::Esc => {
-                self.show_filter_popup = false;
-                self.selected_module = Module::Filters;
-            }
-            // Nothing
+            INDEX_FILTER_OK_BUTTON => {}
             _ => {}
         }
     }

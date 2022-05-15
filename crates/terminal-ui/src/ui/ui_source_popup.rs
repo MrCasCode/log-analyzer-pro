@@ -14,7 +14,7 @@ use tui::{
     Frame, Terminal,
 };
 
-use super::ui_popup::centered_rect;
+use super::{ui_popup::centered_rect, ui_shared::display_cursor};
 
 fn draw_source_type_selector<B>(f: &mut Frame<B>, app: &App, area: Rect)
 where
@@ -41,7 +41,7 @@ fn draw_source_path<B>(f: &mut Frame<B>, app: &App, area: Rect)
 where
     B: Backend,
 {
-    let source_path_widget = Paragraph::new(app.input_buffers[INDEX_SOURCE_PATH].as_ref())
+    let source_path_widget = Paragraph::new(app.input_buffers[INDEX_SOURCE_PATH].value())
         .style(match INDEX_SOURCE_PATH == app.input_buffer_index {
             false => Style::default(),
             true => SELECTED_STYLE,
@@ -49,6 +49,9 @@ where
         .block(Block::default().borders(Borders::ALL).title("Path"));
 
     f.render_widget(source_path_widget, area);
+    if INDEX_SOURCE_PATH == app.input_buffer_index {
+        display_cursor(f, area, app.input_buffers[INDEX_SOURCE_PATH].cursor())
+    }
 }
 
 fn draw_format_list<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
@@ -87,7 +90,7 @@ where
     B: Backend,
 {
     let format_alias_widget =
-        Paragraph::new(app.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].as_ref())
+        Paragraph::new(app.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].value())
             .style(
                 match INDEX_SOURCE_NEW_FORMAT_ALIAS == app.input_buffer_index {
                     false => Style::default(),
@@ -97,6 +100,9 @@ where
             .block(Block::default().borders(Borders::ALL).title("Alias"));
 
     f.render_widget(format_alias_widget, area);
+    if INDEX_SOURCE_NEW_FORMAT_ALIAS == app.input_buffer_index {
+        display_cursor(f, area, app.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].cursor())
+    }
 }
 
 fn draw_new_format_regex<B>(f: &mut Frame<B>, app: &App, area: Rect)
@@ -104,7 +110,7 @@ where
     B: Backend,
 {
     let format_regex_widget =
-        Paragraph::new(app.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].as_ref())
+        Paragraph::new(app.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].value())
             .style(
                 match INDEX_SOURCE_NEW_FORMAT_REGEX == app.input_buffer_index {
                     false => Style::default(),
@@ -114,6 +120,9 @@ where
             .block(Block::default().borders(Borders::ALL).title("Regex"));
 
     f.render_widget(format_regex_widget, area);
+    if INDEX_SOURCE_NEW_FORMAT_REGEX == app.input_buffer_index {
+        display_cursor(f, area, app.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].cursor())
+    }
 }
 
 fn draw_ok_button<B>(f: &mut Frame<B>, app: &App, area: Rect)

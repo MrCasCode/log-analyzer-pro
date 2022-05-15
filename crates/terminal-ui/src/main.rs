@@ -129,7 +129,7 @@ async fn run_app<B: Backend>(
                         // Quit
                         KeyModifiers::CONTROL => match key.code {
                             KeyCode::Char('c') => return Ok(()),
-                            _ => {}
+                            _ => async_std::task::block_on(app.handle_input(key)),
                         },
                         // Navigate
                         KeyModifiers::SHIFT => match key.code {

@@ -9,10 +9,12 @@ use tui::{
 };
 
 use crate::{
-    app::{Module, INDEX_SEARCH, StatefulTable},
+    app::{Module, StatefulTable, INDEX_SEARCH},
     styles::{SELECTED_COLOR, SELECTED_STYLE},
     App,
 };
+
+use super::ui_shared::display_cursor;
 
 fn draw_sources<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
@@ -27,14 +29,14 @@ where
         });
 
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default().bg(SELECTED_COLOR).add_modifier(Modifier::BOLD);
+    let normal_style = Style::default()
+        .bg(SELECTED_COLOR)
+        .add_modifier(Modifier::BOLD);
 
     let header_cells = ["Enabled", "Log", "Format"]
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::Black)));
-    let header = Row::new(header_cells)
-        .style(normal_style)
-        .bottom_margin(1);
+    let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
     let r = app.sources.items.read().unwrap();
     let rows = r.iter().map(|item| {
         let get_enabled_widget = |enabled: bool| match enabled {
@@ -88,9 +90,13 @@ where
     draw_filters(f, app, left_modules[1]);
 }
 
-
-fn draw_log<B>(f: &mut Frame<B>, is_selected: bool, items: &mut StatefulTable<LogLine>, title: &str, area: Rect)
-where
+fn draw_log<B>(
+    f: &mut Frame<B>,
+    is_selected: bool,
+    items: &mut StatefulTable<LogLine>,
+    title: &str,
+    area: Rect,
+) where
     B: Backend,
 {
     let log_widget = Block::default()
@@ -102,21 +108,18 @@ where
         });
 
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default().bg(SELECTED_COLOR).add_modifier(Modifier::BOLD);
+    let normal_style = Style::default()
+        .bg(SELECTED_COLOR)
+        .add_modifier(Modifier::BOLD);
 
     let header_cells = ["Payload"]
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::Black)));
-    let header = Row::new(header_cells)
-        .style(normal_style)
-        .bottom_margin(1);
-
+    let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
 
     let r = items.items.read().unwrap();
     let rows = r.iter().map(|item| {
-        let cells = vec![
-            Cell::from(Span::styled(&item.payload, Style::default())),
-        ];
+        let cells = vec![Cell::from(Span::styled(&item.payload, Style::default()))];
         Row::new(cells).bottom_margin(0)
     });
 
@@ -124,9 +127,7 @@ where
         .header(header)
         .block(log_widget)
         .highlight_style(selected_style)
-        .widths(&[
-            Constraint::Percentage(100),
-        ]);
+        .widths(&[Constraint::Percentage(100)]);
     f.render_stateful_widget(t, area, &mut items.state);
 }
 
@@ -134,14 +135,19 @@ fn draw_search_box<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize,
 where
     B: Backend,
 {
-    let input_widget = Paragraph::new(app.input_buffers[index].as_ref())
+    let module = Module::Search;
+    let input_widget = Paragraph::new(app.input_buffers[index].value())
         .style(match app.selected_module {
-            Module::Search => SELECTED_STYLE,
+            module => SELECTED_STYLE,
             _ => Style::default(),
         })
         .block(Block::default().borders(Borders::ALL).title(title));
 
     f.render_widget(input_widget, area);
+
+    if app.selected_module == module {
+        display_cursor(f, area, app.input_buffers[index].cursor())
+    }
 }
 
 
@@ -151,14 +157,31 @@ where
 {
     let main_modules = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(75), Constraint::Max(3), Constraint::Percentage(15)].as_ref())
+        .constraints(
+            [
+                Constraint::Percentage(75),
+                Constraint::Max(3),
+                Constraint::Percentage(15),
+            ]
+            .as_ref(),
+        )
         .split(area);
 
-    draw_log(f, app.selected_module == Module::Logs, &mut app.log_lines, "Log", main_modules[0]);
+    draw_log(
+        f,
+        app.selected_module == Module::Logs,
+        &mut app.log_lines,
+        "Log",
+        main_modules[0],
+    );
     draw_search_box(f, app, main_modules[1], INDEX_SEARCH, "Search");
-    draw_log(f, app.selected_module == Module::SearchResult, &mut app.search_lines, "Search results", main_modules[2]);
-
-
+    draw_log(
+        f,
+        app.selected_module == Module::SearchResult,
+        &mut app.search_lines,
+        "Search results",
+        main_modules[2],
+    );
 }
 
 pub fn draw_log_analyzer_view<B>(f: &mut Frame<B>, app: &mut App)
