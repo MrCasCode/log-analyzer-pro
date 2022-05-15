@@ -10,6 +10,7 @@ use log_analyzer::services::{
     log_source::SourceType,
 };
 
+use std::collections::{HashMap, HashSet};
 use std::{
     error::Error,
     fmt::{Debug, Display, Formatter},
@@ -237,6 +238,8 @@ pub struct App {
     pub log_lines: StatefulTable<LogLine>,
     pub search_lines: StatefulTable<LogLine>,
 
+    pub log_columns: Vec<(String, bool)>,
+
     pub show_error_message: bool,
 
     pub popup: PopupInteraction,
@@ -276,6 +279,7 @@ impl App {
 
             log_lines: StatefulTable::with_items(log_lines),
             search_lines: StatefulTable::with_items(search_lines),
+            log_columns: LogLine::columns().into_iter().map(|column| (column, true)).collect(),
 
             show_error_message: false,
             popup: PopupInteraction {
@@ -391,11 +395,11 @@ impl App {
     }
 
     async fn handle_log_input(&mut self, key: KeyEvent) {
-        handle_table_input(&mut self.log_lines, key).await;
+        handle_table_input(&mut self.log_lines, &mut self.log_columns, key).await;
     }
 
     async fn handle_search_result_input(&mut self, key: KeyEvent) {
-        handle_table_input(&mut self.search_lines, key).await;
+        handle_table_input(&mut self.search_lines, &mut self.log_columns, key).await;
     }
 
     async fn handle_search_input(&mut self, key: KeyEvent) {
@@ -403,12 +407,10 @@ impl App {
             KeyCode::Enter => {
                 self.log_analyzer
                     .add_search(&self.input_buffers[INDEX_SEARCH].value().into());
-
-            },
+            }
             _ => {
                 let response = input_backend::to_input_request(Event::Key(key))
-                .and_then(|req| Some(self.input_buffers[INDEX_SEARCH].handle(req)));
-
+                    .and_then(|req| Some(self.input_buffers[INDEX_SEARCH].handle(req)));
             }
         }
     }
@@ -646,7 +648,7 @@ impl App {
     }
 }
 
-async fn handle_table_input<T>(table: &mut StatefulTable<T>, key: KeyEvent) {
+async fn handle_table_input<T>(table: &mut StatefulTable<T>, log_columns: &mut Vec<(String, bool)>, key: KeyEvent) {
     let multiplier = if key.modifiers == KeyModifiers::ALT {
         10
     } else {
@@ -680,7 +682,15 @@ async fn handle_table_input<T>(table: &mut StatefulTable<T>, key: KeyEvent) {
             for _ in 0..steps {
                 table.next();
             }
-        }
+        },
+        //KeyCode::Char('I') | KeyCode::Char('i') => log_columns[0].1 = !log_columns[0].1,
+        KeyCode::Char('D') | KeyCode::Char('d') => log_columns[0].1 = !log_columns[0].1,
+        KeyCode::Char('T') | KeyCode::Char('t') => log_columns[1].1 = !log_columns[1].1,
+        KeyCode::Char('A') | KeyCode::Char('a') => log_columns[2].1 = !log_columns[2].1,
+        KeyCode::Char('S') | KeyCode::Char('s') => log_columns[3].1 = !log_columns[3].1,
+        KeyCode::Char('F') | KeyCode::Char('f') => log_columns[4].1 = !log_columns[4].1,
+        KeyCode::Char('P') | KeyCode::Char('p') => log_columns[5].1 = !log_columns[5].1,
+
         // Nothing
         _ => {}
     }

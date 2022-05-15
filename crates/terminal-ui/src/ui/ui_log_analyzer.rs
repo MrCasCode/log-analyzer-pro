@@ -94,6 +94,7 @@ fn draw_log<B>(
     f: &mut Frame<B>,
     is_selected: bool,
     items: &mut StatefulTable<LogLine>,
+    log_columns: &Vec<(String, bool)>,
     title: &str,
     area: Rect,
 ) where
@@ -112,22 +113,28 @@ fn draw_log<B>(
         .bg(SELECTED_COLOR)
         .add_modifier(Modifier::BOLD);
 
-    let header_cells = ["Payload"]
+    let enabled_columns: Vec<&(String, bool)> =
+        log_columns.iter().filter(|(_, enabled)| *enabled).collect();
+
+    let header_cells = enabled_columns
         .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Black)));
+        .map(|(column, _)| Cell::from(column.clone()).style(Style::default().fg(Color::Black)));
     let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
 
     let r = items.items.read().unwrap();
     let rows = r.iter().map(|item| {
-        let cells = vec![Cell::from(Span::styled(&item.payload, Style::default()))];
+        let cells = enabled_columns.iter().map(|(column, _)| Cell::from(Span::styled(item.get(&column).unwrap(), Style::default())));
         Row::new(cells).bottom_margin(0)
     });
+
+    let mut constraints = vec![Constraint::Min(10); enabled_columns.len() - 1];
+    constraints.push(Constraint::Percentage(100));
 
     let t = Table::new(rows)
         .header(header)
         .block(log_widget)
         .highlight_style(selected_style)
-        .widths(&[Constraint::Percentage(100)]);
+        .widths(&constraints);
     f.render_stateful_widget(t, area, &mut items.state);
 }
 
@@ -150,7 +157,6 @@ where
     }
 }
 
-
 fn draw_main_panel<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
@@ -171,6 +177,7 @@ where
         f,
         app.selected_module == Module::Logs,
         &mut app.log_lines,
+        &mut app.log_columns,
         "Log",
         main_modules[0],
     );
@@ -179,6 +186,7 @@ where
         f,
         app.selected_module == Module::SearchResult,
         &mut app.search_lines,
+        &mut app.log_columns,
         "Search results",
         main_modules[2],
     );
