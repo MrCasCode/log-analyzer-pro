@@ -96,6 +96,7 @@ fn draw_log<B>(
     items: &mut StatefulTable<LogLine>,
     log_columns: &Vec<(String, bool)>,
     title: &str,
+    horizontal_offset: usize,
     area: Rect,
 ) where
     B: Backend,
@@ -123,11 +124,19 @@ fn draw_log<B>(
 
     let r = items.items.read().unwrap();
     let rows = r.iter().map(|item| {
-        let cells = enabled_columns.iter().map(|(column, _)| Cell::from(Span::styled(item.get(&column).unwrap(), Style::default())));
+        let cells = enabled_columns.iter().map(|(column, _)| {
+            Cell::from(Span::styled(
+                item.get(&column)
+                    .unwrap()
+                    .get(horizontal_offset..)
+                    .unwrap_or_default(),
+                Style::default(),
+            ))
+        });
         Row::new(cells).bottom_margin(0)
     });
 
-    let mut constraints = vec![Constraint::Min(10); enabled_columns.len() - 1];
+    let mut constraints = vec![Constraint::Min(15); enabled_columns.len() - 1];
     constraints.push(Constraint::Percentage(100));
 
     let t = Table::new(rows)
@@ -142,17 +151,16 @@ fn draw_search_box<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize,
 where
     B: Backend,
 {
-    let module = Module::Search;
     let input_widget = Paragraph::new(app.input_buffers[index].value())
         .style(match app.selected_module {
-            module => SELECTED_STYLE,
+            Module::Search => SELECTED_STYLE,
             _ => Style::default(),
         })
         .block(Block::default().borders(Borders::ALL).title(title));
 
     f.render_widget(input_widget, area);
 
-    if app.selected_module == module {
+    if app.selected_module == Module::Search {
         display_cursor(f, area, app.input_buffers[index].cursor())
     }
 }
@@ -179,6 +187,7 @@ where
         &mut app.log_lines,
         &mut app.log_columns,
         "Log",
+        app.horizontal_offset,
         main_modules[0],
     );
     draw_search_box(f, app, main_modules[1], INDEX_SEARCH, "Search");
@@ -188,6 +197,7 @@ where
         &mut app.search_lines,
         &mut app.log_columns,
         "Search results",
+        app.horizontal_offset,
         main_modules[2],
     );
 }
@@ -196,10 +206,15 @@ pub fn draw_log_analyzer_view<B>(f: &mut Frame<B>, app: &mut App)
 where
     B: Backend,
 {
+    let constraints = if app.show_side_panel {
+        [Constraint::Percentage(25), Constraint::Percentage(75)].as_ref()
+    } else {
+        [Constraint::Percentage(0), Constraint::Percentage(100)].as_ref()
+    };
     // Create two chunks with equal horizontal screen space
     let panels = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(25), Constraint::Percentage(75)].as_ref())
+        .constraints(constraints)
         .split(f.size());
 
     draw_sidebar(f, app, panels[0]);

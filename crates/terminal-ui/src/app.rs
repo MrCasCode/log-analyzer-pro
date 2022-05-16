@@ -237,6 +237,7 @@ pub struct App {
 
     pub log_lines: StatefulTable<LogLine>,
     pub search_lines: StatefulTable<LogLine>,
+    pub horizontal_offset: usize,
 
     pub log_columns: Vec<(String, bool)>,
 
@@ -279,6 +280,7 @@ impl App {
 
             log_lines: StatefulTable::with_items(log_lines),
             search_lines: StatefulTable::with_items(search_lines),
+            horizontal_offset: 0,
             log_columns: LogLine::columns().into_iter().map(|column| (column, true)).collect(),
 
             show_error_message: false,
@@ -395,11 +397,11 @@ impl App {
     }
 
     async fn handle_log_input(&mut self, key: KeyEvent) {
-        handle_table_input(&mut self.log_lines, &mut self.log_columns, key).await;
+        handle_table_input(&mut self.log_lines, &mut self.log_columns, &mut self.horizontal_offset, key).await;
     }
 
     async fn handle_search_result_input(&mut self, key: KeyEvent) {
-        handle_table_input(&mut self.search_lines, &mut self.log_columns, key).await;
+        handle_table_input(&mut self.search_lines, &mut self.log_columns, &mut self.horizontal_offset, key).await;
     }
 
     async fn handle_search_input(&mut self, key: KeyEvent) {
@@ -648,7 +650,7 @@ impl App {
     }
 }
 
-async fn handle_table_input<T>(table: &mut StatefulTable<T>, log_columns: &mut Vec<(String, bool)>, key: KeyEvent) {
+async fn handle_table_input<T>(table: &mut StatefulTable<T>, log_columns: &mut Vec<(String, bool)>, horizontal_offset: &mut usize, key: KeyEvent) {
     let multiplier = if key.modifiers == KeyModifiers::ALT {
         10
     } else {
@@ -683,6 +685,10 @@ async fn handle_table_input<T>(table: &mut StatefulTable<T>, log_columns: &mut V
                 table.next();
             }
         },
+        // Navigate up log_lines
+        KeyCode::Left => *horizontal_offset -= if *horizontal_offset == 0 {0} else {10},
+        // Navigate down log_lines
+        KeyCode::Right => *horizontal_offset += 10,
         //KeyCode::Char('I') | KeyCode::Char('i') => log_columns[0].1 = !log_columns[0].1,
         KeyCode::Char('D') | KeyCode::Char('d') => log_columns[0].1 = !log_columns[0].1,
         KeyCode::Char('T') | KeyCode::Char('t') => log_columns[1].1 = !log_columns[1].1,

@@ -78,7 +78,7 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
 
 
     // create app and run it
-    let tick_rate = Duration::from_millis(50);
+    let tick_rate = Duration::from_millis(10);
     let app = App::new(Box::new(log_service)).await;
     let res = run_app(&mut terminal, app, tick_rate).await;
 
@@ -129,6 +129,7 @@ async fn run_app<B: Backend>(
                         // Quit
                         KeyModifiers::CONTROL => match key.code {
                             KeyCode::Char('c') => return Ok(()),
+                            KeyCode::Char('s') => app.show_side_panel = !app.show_side_panel,
                             _ => async_std::task::block_on(app.handle_input(key)),
                         },
                         // Navigate
