@@ -12,7 +12,8 @@ pub trait ProcessingStore {
     fn get_format(&self, id: &String) -> Option<String>;
     fn get_formats(&self) -> Vec<Format>;
     fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool);
-    fn get_filters(&self) -> Vec<Filter>;
+    fn get_filters(&self) -> Vec<(bool, Filter)>;
+    fn toggle_filter(&self, id: &String);
 }
 pub struct InMemmoryProcessingStore {
     /// Map of <alias, Regex string>
@@ -60,19 +61,25 @@ impl ProcessingStore for InMemmoryProcessingStore {
         w.insert(id, (action, filter, enabled));
     }
 
-    fn get_filters(&self) -> Vec<Filter> {
+    fn get_filters(&self) -> Vec<(bool, Filter)> {
         let r = self.filters.read().unwrap();
 
         let filters = r
-            .values()
-            .filter(|(_action, _filter, enabled)| *enabled == true)
-            .map(|(action, filter, _enabled)| Filter {
-                alias: "".to_string(),
+            .iter()
+            .map(|(id, (action, filter, enabled))| (*enabled, Filter {
+                alias: id.clone(),
                 action: action.clone(),
                 filter: filter.clone(),
-            })
+            }))
             .collect();
 
         filters
+    }
+
+    fn toggle_filter(&self, id: &String) {
+        let mut w = self.filters.write().unwrap();
+        if let Some((_, _, enabled)) = w.get_mut(id) {
+            *enabled = !*enabled
+        }
     }
 }

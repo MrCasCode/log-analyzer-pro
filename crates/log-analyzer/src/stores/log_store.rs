@@ -11,6 +11,8 @@ pub trait LogStore {
     fn add_line(&self, log_id: &String, line: &String);
     fn get_format(&self, log_id: &String) -> Option<String>;
     fn get_logs(&self) -> Vec<(bool, String, String)>;
+    fn get_lines(&self, log_id: &String) -> Vec<String>;
+    fn extract_lines(&self, log_id: &String) -> Vec<String>;
 }
 
 pub struct InMemmoryLogStore {
@@ -55,6 +57,20 @@ impl LogStore for InMemmoryLogStore {
         }
         let raw_lines = raw_lines_lock.get_mut(log_id).unwrap();
         raw_lines.push(line.clone());
+    }
+
+    fn get_lines(&self, log_id: &String) -> Vec<String> {
+        match self.raw_lines.read().unwrap().get(log_id) {
+            Some(lines) => lines.clone(),
+            _ => Vec::new()
+        }
+    }
+
+    fn extract_lines(&self, log_id: &String) -> Vec<String> {
+        let mut w = self.raw_lines.write().unwrap();
+        let lines = std::mem::take(w.get_mut(log_id).unwrap());
+
+        lines
     }
 
     fn get_logs(&self) -> Vec<(bool, String, String)> {

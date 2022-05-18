@@ -6,6 +6,7 @@ pub trait AnalysisStore {
     fn add_search_lines(&self, lines: &[&LogLine]);
     fn add_search_query(&self, query: &String);
     fn get_search_query(&self) -> Option<String>;
+    fn reset_log(&self);
     fn reset_search(&self);
     fn fetch_log(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn fetch_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
@@ -57,6 +58,11 @@ impl AnalysisStore for InMemmoryAnalysisStore {
 
     fn fetch_search(&self) -> Arc<RwLock<Vec<LogLine>>> {
         self.search_log.clone()
+    }
+
+    fn reset_log(&self) {
+        let mut w = self.log.write().unwrap();
+        w.clear();
     }
 
     fn reset_search(&self) {

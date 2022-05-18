@@ -74,7 +74,37 @@ where
             Module::Filters => SELECTED_STYLE,
             _ => Style::default(),
         });
-    f.render_widget(filters_widget, area);
+    let selected_style = Style::default().add_modifier(Modifier::REVERSED);
+    let normal_style = Style::default()
+        .bg(SELECTED_COLOR)
+        .add_modifier(Modifier::BOLD);
+
+    let header_cells = ["Enabled", "Filter"]
+        .iter()
+        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Black)));
+    let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
+    let r = app.filters.items.read().unwrap();
+    let rows = r.iter().map(|item| {
+        let get_enabled_widget = |enabled: bool| match enabled {
+            true => Span::styled("V", Style::default().fg(SELECTED_COLOR)),
+            false => Span::styled("X", Style::default().fg(Color::Gray)),
+        };
+
+        let cells = vec![
+            Cell::from(get_enabled_widget(item.0)),
+            Cell::from(Text::from(item.1.as_str()))
+        ];
+        Row::new(cells).bottom_margin(0)
+    });
+    let t = Table::new(rows)
+        .header(header)
+        .block(filters_widget)
+        .highlight_style(selected_style)
+        .widths(&[
+            Constraint::Percentage(20),
+            Constraint::Percentage(80),
+        ]);
+    f.render_stateful_widget(t, area, &mut app.filters.state);
 }
 
 fn draw_sidebar<B>(f: &mut Frame<B>, app: &mut App, area: Rect)

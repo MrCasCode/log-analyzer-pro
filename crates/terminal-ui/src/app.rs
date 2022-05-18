@@ -213,7 +213,7 @@ impl<T> StatefulList<T> {
 /// Check the event handling at the bottom to see how to change the state on incoming events.
 /// Check the drawing logic for items on how to specify the highlighting style for selected items.
 pub struct App {
-    pub log_analyzer: Box<dyn LogAnalyzer>,
+    pub log_analyzer: Box<Arc<dyn LogAnalyzer>>,
 
     pub selected_module: Module,
 
@@ -234,6 +234,8 @@ pub struct App {
 
     // Display all log sources in the sources panel
     pub sources: StatefulTable<(bool, String, String)>,
+    // Display all filters in the filters panel
+    pub filters: StatefulTable<(bool, String)>,
 
     pub log_lines: StatefulTable<LogLine>,
     pub search_lines: StatefulTable<LogLine>,
@@ -247,7 +249,7 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(log_analyzer: Box<dyn LogAnalyzer>) -> App {
+    pub async fn new(log_analyzer: Box<Arc<dyn LogAnalyzer>>) -> App {
         let mut formats = vec!["New".to_string()];
         formats.extend(
             log_analyzer
@@ -257,6 +259,13 @@ impl App {
         );
 
         let sources = Arc::new(RwLock::new(log_analyzer.get_logs()));
+        let filters = Arc::new(RwLock::new(
+            log_analyzer
+                .get_filters()
+                .iter()
+                .map(|(enabled, filter)| (*enabled, filter.alias.clone()))
+                .collect(),
+        ));
         let log_lines = log_analyzer.get_log();
         let search_lines = log_analyzer.get_search();
 
@@ -277,11 +286,15 @@ impl App {
             filter_color: 0,
 
             sources: StatefulTable::with_items(sources),
+            filters: StatefulTable::with_items(filters),
 
             log_lines: StatefulTable::with_items(log_lines),
             search_lines: StatefulTable::with_items(search_lines),
             horizontal_offset: 0,
-            log_columns: LogLine::columns().into_iter().map(|column| (column, true)).collect(),
+            log_columns: LogLine::columns()
+                .into_iter()
+                .map(|column| (column, true))
+                .collect(),
 
             show_error_message: false,
             popup: PopupInteraction {
@@ -305,7 +318,7 @@ impl App {
                 .value()
                 .to_string();
 
-            self.log_analyzer.add_format(&alias, &regex).await?;
+            self.log_analyzer.add_format(&alias, &regex)?;
             self.update_formats().await;
         } else {
             alias = self.formats.items[selected_format_index].clone();
@@ -338,16 +351,7 @@ impl App {
     }
 
     async fn on_event(&mut self) {
-        let receiver = self.log_analyzer.on_event();
-        let mut events = Vec::new();
 
-        while let Ok(evt) = receiver.try_recv() {
-            events.push(evt);
-        }
-
-        if events.contains(&LogEvent::NewLine) {}
-
-        if events.contains(&LogEvent::NewSearchLine) {}
     }
 
     /// Rotate through the event list.
@@ -373,13 +377,9 @@ impl App {
     async fn handle_sources_input(&mut self, key: KeyEvent) {
         match key.code {
             // Navigate up sources
-            KeyCode::Up => {
-                self.sources.previous();
-            }
+            KeyCode::Up => self.sources.previous(),
             // Navigate down sources
-            KeyCode::Down => {
-                self.sources.next();
-            }
+            KeyCode::Down => self.sources.next(),
             // Toggle enabled/disabled source
             KeyCode::Enter => {}
             // Add new source -> Popup window
@@ -396,12 +396,51 @@ impl App {
         }
     }
 
+    async fn handle_filters_input(&mut self, key: KeyEvent) {
+        match key.code {
+            // Navigate up filters
+            KeyCode::Up => self.filters.previous(),
+            // Navigate down filters
+            KeyCode::Down => self.filters.next(),
+            // Toggle enabled/disabled source
+            KeyCode::Enter => {
+                if let Some(index) = self.filters.state.selected() {
+                    let (_, alias) = &self.filters.items.read().unwrap()[index];
+                    self.log_analyzer.toggle_filter(alias);
+
+                }
+            }
+            // Add new filter -> Popup window
+            KeyCode::Char('i') | KeyCode::Char('+') | KeyCode::Char('a') => {
+                self.show_filter_popup = true;
+                self.input_buffer_index = INDEX_FILTER_NAME;
+                self.selected_module = Module::FilterPopup;
+            }
+            // Delete source
+            KeyCode::Char('-') | KeyCode::Char('d') | KeyCode::Delete => {}
+            // Nothing
+            _ => {}
+        }
+    }
+
     async fn handle_log_input(&mut self, key: KeyEvent) {
-        handle_table_input(&mut self.log_lines, &mut self.log_columns, &mut self.horizontal_offset, key).await;
+        handle_table_input(
+            &mut self.log_lines,
+            &mut self.log_columns,
+            &mut self.horizontal_offset,
+            key,
+        )
+        .await;
     }
 
     async fn handle_search_result_input(&mut self, key: KeyEvent) {
-        handle_table_input(&mut self.search_lines, &mut self.log_columns, &mut self.horizontal_offset, key).await;
+        handle_table_input(
+            &mut self.search_lines,
+            &mut self.log_columns,
+            &mut self.horizontal_offset,
+            key,
+        )
+        .await;
     }
 
     async fn handle_search_input(&mut self, key: KeyEvent) {
@@ -547,27 +586,6 @@ impl App {
         }
     }
 
-    async fn handle_filters_input(&mut self, key: KeyEvent) {
-        match key.code {
-            // Navigate up sources
-            KeyCode::Up => {}
-            // Navigate down sources
-            KeyCode::Down => {}
-            // Toggle enabled/disabled source
-            KeyCode::Enter => {}
-            // Add new source -> Popup window
-            KeyCode::Char('i') | KeyCode::Char('+') | KeyCode::Char('a') => {
-                self.show_filter_popup = true;
-                self.input_buffer_index = INDEX_FILTER_NAME;
-                self.selected_module = Module::FilterPopup;
-            }
-            // Delete source
-            KeyCode::Char('-') | KeyCode::Char('d') | KeyCode::Delete => {}
-            // Nothing
-            _ => {}
-        }
-    }
-
     pub fn navigate(&mut self, direction: KeyCode) {
         match self.selected_module {
             Module::Sources => match direction {
@@ -650,7 +668,12 @@ impl App {
     }
 }
 
-async fn handle_table_input<T>(table: &mut StatefulTable<T>, log_columns: &mut Vec<(String, bool)>, horizontal_offset: &mut usize, key: KeyEvent) {
+async fn handle_table_input<T>(
+    table: &mut StatefulTable<T>,
+    log_columns: &mut Vec<(String, bool)>,
+    horizontal_offset: &mut usize,
+    key: KeyEvent,
+) {
     let multiplier = if key.modifiers == KeyModifiers::ALT {
         10
     } else {
@@ -684,9 +707,9 @@ async fn handle_table_input<T>(table: &mut StatefulTable<T>, log_columns: &mut V
             for _ in 0..steps {
                 table.next();
             }
-        },
+        }
         // Navigate up log_lines
-        KeyCode::Left => *horizontal_offset -= if *horizontal_offset == 0 {0} else {10},
+        KeyCode::Left => *horizontal_offset -= if *horizontal_offset == 0 { 0 } else { 10 },
         // Navigate down log_lines
         KeyCode::Right => *horizontal_offset += 10,
         //KeyCode::Char('I') | KeyCode::Char('i') => log_columns[0].1 = !log_columns[0].1,

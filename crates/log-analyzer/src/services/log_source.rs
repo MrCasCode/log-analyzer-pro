@@ -8,7 +8,7 @@ use async_std::{prelude::*, task, channel};
 use async_std::task::JoinHandle;
 use async_std::{fs::File, io::BufReader, io::Seek, io::SeekFrom, stream::Stream};
 //use tokio::sync::{broadcast::Sender};
-use async_std::{prelude::*, channel::Receiver, channel::Sender};
+use std::sync::mpsc::SyncSender;
 use futures::{StreamExt};
 
 use crate::models::log::Log;
@@ -70,7 +70,7 @@ pub async fn create_source(source: SourceType, source_address: String) -> Result
 
 #[async_trait]
 pub trait LogSource {
-    async fn run(&self, sender: Sender<(String, String)>) -> Result<()>;
+    async fn run(&self, sender: SyncSender<(String, String)>) -> Result<()>;
 }
 
 
@@ -81,7 +81,7 @@ pub struct FileSource {
 
 #[async_trait]
 impl LogSource for FileSource {
-    async fn run(&self, sender: Sender<(String, String)>) -> Result<()> {
+    async fn run(&self, sender: SyncSender<(String, String)>) -> Result<()> {
         let mut read_lines = 0_usize;
         loop {
             let file = File::open(&self.path).await;
@@ -91,7 +91,7 @@ impl LogSource for FileSource {
 
                     let mut lines = reader.lines().skip(read_lines);
                     while let Some(line) = lines.next().await {
-                        sender.send((self.path.clone(), line?)).await?;
+                        sender.send((self.path.clone(), line?))?;
                         read_lines += 1;
                     }
                 },
@@ -115,7 +115,7 @@ pub struct WsSource {
 
 #[async_trait]
 impl LogSource for WsSource {
-    async fn run(&self, sender: Sender<(String, String)>) -> Result<()> {
+    async fn run(&self, sender: SyncSender<(String, String)>) -> Result<()> {
         unimplemented!()
     }
 }

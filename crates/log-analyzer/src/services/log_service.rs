@@ -1,11 +1,15 @@
 use std::sync::{Arc, RwLock};
 
 use anyhow::{anyhow, Result};
-use async_std::{channel, channel::Receiver, channel::Sender, prelude::*};
+use std::time::Duration;
+use std::sync::mpsc::{self, SyncSender};
+use std::sync::mpsc::{Receiver, Sender};
 //use tokio::sync::{broadcast, broadcast::Receiver, broadcast::Sender};
 
 use futures::join;
 use regex::Regex;
+use rayon::prelude::*;
+use rayon::iter::ParallelBridge;
 
 use crate::domain::apply_filters::apply_filters;
 use crate::domain::apply_format::apply_format;
@@ -29,29 +33,26 @@ pub enum Event {
 #[async_trait]
 pub trait LogAnalyzer {
     async fn add_log(
-        &mut self,
+        &self,
         source_type: usize,
         source_address: &String,
         format: &String,
     ) -> Result<()>;
-    async fn add_format(&self, alias: &String, regex: &String) -> Result<()>;
+    fn add_format(&self, alias: &String, regex: &String) -> Result<()>;
     fn add_search(&self, regex: &String) -> Result<()>;
     fn get_log(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_logs(&self) -> Vec<(bool, String, String)>;
     fn get_formats(&self) -> Vec<Format>;
-    fn get_filters(&self) -> Vec<Filter>;
-    fn on_event(&self) -> Receiver<Event>;
+    fn get_filters(&self) -> Vec<(bool, Filter)>;
+    fn toggle_filter(&self, id: &String);
 }
 
 pub struct LogService {
     log_store: Arc<dyn LogStore + Sync + Send>,
     processing_store: Arc<dyn ProcessingStore + Sync + Send>,
     analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
-    source_channels: (Sender<(String, String)>, Receiver<(String, String)>),
-    format_channels: (Sender<(String, String)>, Receiver<(String, String)>),
-    filter_channels: (Sender<(String, LogLine)>, Receiver<(String, LogLine)>),
-    event_channels: (Sender<Event>, Receiver<Event>),
+    sender: SyncSender<(String, String)>,
 }
 
 impl LogService {
@@ -59,76 +60,76 @@ impl LogService {
         log_store: Arc<dyn LogStore + Sync + Send>,
         processing_store: Arc<dyn ProcessingStore + Sync + Send>,
         analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
-    ) -> Self {
-        let source_channels = channel::unbounded();
-        let format_channels = channel::unbounded();
-        let filter_channels = channel::unbounded();
-        let event_channels = channel::unbounded();
+    ) -> Arc<Self> {
+        let (sender, receiver) = mpsc::sync_channel(4096);
 
-        let raw_line_log_store = log_store.clone();
-        let raw_line_receiver = source_channels.1.clone();
-        let raw_line_format_sender = format_channels.0.clone();
-        std::thread::spawn(|| {
-            async_std::task::spawn(async move {
-                while let Ok((path, line)) = raw_line_receiver.recv().await {
-                    raw_line_log_store.add_line(&path, &line);
-                    if let Some(alias) = raw_line_log_store.get_format(&path) {
-                        raw_line_format_sender.send((alias, line)).await;
-                    }
-                }
-            });
-        });
-
-        let format_line_processing_store = processing_store.clone();
-        let format_line_receiver = format_channels.1.clone();
-        let format_line_filter_sender = filter_channels.0.clone();
-        std::thread::spawn(|| {
-            async_std::task::spawn(async move {
-                while let Ok((path, line)) = format_line_receiver.recv().await {
-                    if let Some(format) = format_line_processing_store.get_format(&path) {
-                        if let Some(line) = apply_format(&format, &line) {
-                            format_line_filter_sender.send((path, line)).await;
-                        }
-                    }
-                }
-            });
-        });
-
-        let filter_line_processing_store = processing_store.clone();
-        let filter_line_analysis_store = analysis_store.clone();
-        let filter_line_receiver = filter_channels.1.clone();
-        let filter_line_sender = event_channels.0.clone();
-
-        std::thread::spawn(|| {
-            async_std::task::spawn(async move {
-                while let Ok((_path, log_line)) = filter_line_receiver.recv().await {
-                    let filters = filter_line_processing_store.get_filters();
-                    if let Some(filtered_line) = apply_filters(&filters, log_line) {
-                        let search_query = filter_line_analysis_store.get_search_query();
-                        filter_line_analysis_store.add_lines(&[&filtered_line]);
-
-                        filter_line_sender.send(Event::NewLine).await;
-
-                        if search_query.is_some()
-                            && apply_search(&search_query.unwrap(), &filtered_line)
-                        {
-                            filter_line_analysis_store.add_search_lines(&[&filtered_line]);
-
-                            filter_line_sender.send(Event::NewSearchLine).await;
-                        }
-                    }
-                }
-            });
-        });
-
-        Self {
+        let log_service = Arc::new(Self {
             log_store,
             processing_store,
             analysis_store,
-            source_channels,
-            format_channels,
-            filter_channels,
-            event_channels,
+            sender,
+        });
+
+        let log = log_service.clone();
+        std::thread::spawn(move || {
+            let timeout = Duration::from_millis(10);
+            loop {
+                let mut processing_queue = Vec::with_capacity(100);
+                while let Ok(value) = receiver.recv_timeout(timeout) {
+                    processing_queue.push(value);
+
+                    if processing_queue.len() >= 100 {
+                        break;
+                    }
+                }
+                processing_queue
+                  .into_par_iter()
+                  .filter_map(|(path, line)| log.process_raw_line(path, line))
+                  .filter_map(|(path, line)| log.apply_format(path, line))
+                  .filter_map(|(path, line)| log.apply_filters(path, line))
+                  .for_each(|(path, line)| log.apply_search(path, line));
+            }
+        });
+
+        log_service
+    }
+
+    fn process_raw_line(&self, path: String, line: String) -> Option<(String, String)> {
+        self.log_store.add_line(&path, &line);
+        match self.log_store.get_format(&path) {
+            Some(alias) => Some((alias, line)),
+            None => None,
+        }
+    }
+
+    fn apply_format(&self, path: String, line: String) -> Option<(String, LogLine)> {
+        let format = self.processing_store.get_format(&path)?;
+
+        match apply_format(&format, &line) {
+            Some(line) => Some((path, line)),
+            None => None,
+        }
+    }
+
+    fn apply_filters(&self, path: String, log_line: LogLine) -> Option<(String, LogLine)>{
+        let filters: Vec<Filter> = self.processing_store
+                        .get_filters()
+                        .into_iter()
+                        .filter(|(enabled, _)| *enabled)
+                        .map(|(_, filter)| filter)
+                        .collect();
+
+        let filtered_line = apply_filters(&filters, log_line)?;
+        self.analysis_store.add_lines(&[&filtered_line]);
+        Some((path, filtered_line))
+    }
+
+    fn apply_search(&self, path: String, log_line: LogLine) {
+        let search_query = self.analysis_store.get_search_query();
+
+        if search_query.is_some() && apply_search(&search_query.unwrap(), &log_line)
+        {
+            self.analysis_store.add_search_lines(&[&log_line]);
         }
     }
 }
@@ -136,12 +137,12 @@ impl LogService {
 #[async_trait]
 impl LogAnalyzer for LogService {
     async fn add_log(
-        &mut self,
+        &self,
         source_type: usize,
         source_address: &String,
         format: &String,
     ) -> Result<()> {
-        let sender = self.source_channels.0.clone();
+        let sender = self.sender.clone();
         let log_store = self.log_store.clone();
 
         let source_type = SourceType::try_from(source_type).unwrap();
@@ -149,17 +150,18 @@ impl LogAnalyzer for LogService {
         let log_source = Arc::new(create_source(source_type, source_address.clone()).await?);
         log_store.add_log(&source_address, log_source.clone(), &format, true);
 
-        async_std::task::spawn(async move {
-            log_source.run(sender).await.unwrap();
+        std::thread::spawn(|| {
+            async_std::task::spawn(async move {
+                log_source.run(sender).await.unwrap();
+            });
         });
 
         Ok(())
     }
 
-    async fn add_format(&self, alias: &String, regex: &String) -> Result<()> {
+    fn add_format(&self, alias: &String, regex: &String) -> Result<()> {
         let format = Format::new(alias, regex)?;
-        self.processing_store
-            .add_format(format.alias, format.regex);
+        self.processing_store.add_format(format.alias, format.regex);
         Ok(())
     }
 
@@ -203,11 +205,27 @@ impl LogAnalyzer for LogService {
         self.processing_store.get_formats()
     }
 
-    fn get_filters(&self) -> Vec<Filter> {
+    fn get_filters(&self) -> Vec<(bool, Filter)> {
         self.processing_store.get_filters()
     }
 
-    fn on_event(&self) -> Receiver<Event> {
-        self.event_channels.1.clone()
+    fn toggle_filter(&self, id: &String) {
+        self.processing_store.toggle_filter(id);
+        self.analysis_store.reset_log();
+
+        let enabled_logs: Vec<String> = self
+            .log_store
+            .get_logs()
+            .into_iter()
+            .filter(|(enabled, _, _)| *enabled)
+            .map(|(_, id, _)| id)
+            .collect();
+
+        for log in enabled_logs {
+            let lines = self.log_store.extract_lines(&log);
+            for line in lines {
+                self.sender.send((log.clone(), line));
+            }
+        }
     }
 }

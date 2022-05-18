@@ -1,3 +1,5 @@
+use regex::Regex;
+
 use crate::models::{filter::{Filter, FilterAction}, log_line::LogLine};
 
 
@@ -5,12 +7,11 @@ fn filter_line<'a >(filtering: &'a LogLine, log_line: &'a mut LogLine) -> bool {
     let mut is_match = false;
     for (filter, line) in std::iter::zip(&filtering, &log_line) {
         if filter.len() > 0 {
-            if let Some(_) = line.find(filter) {
-                is_match = true;
-            }
-            else {
-                is_match = false;
-                break;
+            if let Ok(re) = Regex::new(filter) {
+                is_match = re.is_match(line);
+                if is_match == false {
+                    break;
+                }
             }
         }
     }
