@@ -1,15 +1,15 @@
 use std::sync::{Arc, RwLock};
 
 use anyhow::{anyhow, Result};
-use std::time::Duration;
 use std::sync::mpsc::{self, SyncSender};
 use std::sync::mpsc::{Receiver, Sender};
+use std::time::Duration;
 //use tokio::sync::{broadcast, broadcast::Receiver, broadcast::Sender};
 
 use futures::join;
-use regex::Regex;
-use rayon::prelude::*;
 use rayon::iter::ParallelBridge;
+use rayon::prelude::*;
+use regex::Regex;
 
 use crate::domain::apply_filters::apply_filters;
 use crate::domain::apply_format::apply_format;
@@ -19,6 +19,7 @@ use crate::models::{filter::Filter, format::Format, log::Log, log_line::LogLine}
 use crate::stores::analysis_store::AnalysisStore;
 use crate::stores::log_store::LogStore;
 use crate::stores::processing_store::ProcessingStore;
+use crate::stores::regex_cache::RegexCache;
 
 use super::log_source::{create_source, LogSource, SourceType};
 
@@ -52,7 +53,8 @@ pub struct LogService {
     log_store: Arc<dyn LogStore + Sync + Send>,
     processing_store: Arc<dyn ProcessingStore + Sync + Send>,
     analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
-    sender: SyncSender<(String, String)>,
+    sender: SyncSender<(String, Vec<String>)>,
+    regex_cache: RwLock<RegexCache>,
 }
 
 impl LogService {
@@ -61,63 +63,63 @@ impl LogService {
         processing_store: Arc<dyn ProcessingStore + Sync + Send>,
         analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
     ) -> Arc<Self> {
-        let (sender, receiver) = mpsc::sync_channel(4096);
+        let (sender, receiver) = mpsc::sync_channel(2_usize.pow(26));
 
         let log_service = Arc::new(Self {
             log_store,
             processing_store,
             analysis_store,
             sender,
+            regex_cache: RwLock::new(RegexCache::new()),
         });
 
         let log = log_service.clone();
         std::thread::spawn(move || {
-            let timeout = Duration::from_millis(10);
             loop {
-                let mut processing_queue = Vec::with_capacity(100);
-                while let Ok(value) = receiver.recv_timeout(timeout) {
-                    processing_queue.push(value);
-
-                    if processing_queue.len() >= 100 {
-                        break;
+                while let Ok((path, lines)) = receiver.recv() {
+                    let now = std::time::Instant::now();
+                    if let Some((path, lines)) = log.process_raw_lines(path, lines) {
+                        lines.into_iter().map(|line| (path.clone(), line))
+                        .par_bridge()
+                        .filter_map(|(path, line)| log.apply_format(path, line))
+                        .filter_map(|(path, line)| log.apply_filters(path, line))
+                        .for_each(|(path, line)| log.apply_search(path, line));
                     }
+                    println!("processed {} in {}", log.get_log().read().unwrap().len(), now.elapsed().as_millis());
                 }
-                processing_queue
-                  .into_par_iter()
-                  .filter_map(|(path, line)| log.process_raw_line(path, line))
-                  .filter_map(|(path, line)| log.apply_format(path, line))
-                  .filter_map(|(path, line)| log.apply_filters(path, line))
-                  .for_each(|(path, line)| log.apply_search(path, line));
             }
         });
 
         log_service
     }
 
-    fn process_raw_line(&self, path: String, line: String) -> Option<(String, String)> {
-        self.log_store.add_line(&path, &line);
+    fn process_raw_lines(&self, path: String, lines: Vec<String>) -> Option<(String, Vec<String>)> {
+        self.log_store.add_lines(&path, &lines);
         match self.log_store.get_format(&path) {
-            Some(alias) => Some((alias, line)),
+            Some(alias) => Some((alias, lines)),
             None => None,
         }
     }
 
     fn apply_format(&self, path: String, line: String) -> Option<(String, LogLine)> {
         let format = self.processing_store.get_format(&path)?;
+        let r = self.regex_cache.read().unwrap();
+        let format_regex = r.get(&format)?;
 
-        match apply_format(&format, &line) {
+        match apply_format(&format_regex, &line) {
             Some(line) => Some((path, line)),
             None => None,
         }
     }
 
-    fn apply_filters(&self, path: String, log_line: LogLine) -> Option<(String, LogLine)>{
-        let filters: Vec<Filter> = self.processing_store
-                        .get_filters()
-                        .into_iter()
-                        .filter(|(enabled, _)| *enabled)
-                        .map(|(_, filter)| filter)
-                        .collect();
+    fn apply_filters(&self, path: String, log_line: LogLine) -> Option<(String, LogLine)> {
+        let filters: Vec<Filter> = self
+            .processing_store
+            .get_filters()
+            .into_iter()
+            .filter(|(enabled, _)| *enabled)
+            .map(|(_, filter)| filter)
+            .collect();
 
         let filtered_line = apply_filters(&filters, log_line)?;
         self.analysis_store.add_lines(&[&filtered_line]);
@@ -125,11 +127,12 @@ impl LogService {
     }
 
     fn apply_search(&self, path: String, log_line: LogLine) {
-        let search_query = self.analysis_store.get_search_query();
-
-        if search_query.is_some() && apply_search(&search_query.unwrap(), &log_line)
-        {
-            self.analysis_store.add_search_lines(&[&log_line]);
+        if let Some(search_query) = self.analysis_store.get_search_query() {
+            let r = self.regex_cache.read().unwrap();
+            let search_regex = r.get(&search_query);
+            if search_regex.is_some() && apply_search(&search_regex.unwrap(), &log_line) {
+                self.analysis_store.add_search_lines(&[&log_line]);
+            }
         }
     }
 }
@@ -161,6 +164,9 @@ impl LogAnalyzer for LogService {
 
     fn add_format(&self, alias: &String, regex: &String) -> Result<()> {
         let format = Format::new(alias, regex)?;
+
+        self.regex_cache.write().unwrap().put(&regex);
+
         self.processing_store.add_format(format.alias, format.regex);
         Ok(())
     }
@@ -168,17 +174,19 @@ impl LogAnalyzer for LogService {
     fn add_search(&self, regex: &String) -> Result<()> {
         let re = Regex::new(&regex);
         match re {
-            Ok(r) => {
+            Ok(_) => {
                 self.analysis_store.add_search_query(regex);
                 self.analysis_store.reset_search();
 
                 let r = self.analysis_store.fetch_log();
                 let log = r.read().unwrap();
 
-                for log_line in &*log {
-                    if apply_search(&regex, &log_line) {
-                        self.analysis_store.add_search_lines(&[&log_line]);
-                    }
+                if let Some(re) = self.regex_cache.write().unwrap().put(&regex) {
+                    log.par_iter().for_each(|log_line| {
+                        if apply_search(&re, &log_line) {
+                            self.analysis_store.add_search_lines(&[&log_line]);
+                        }
+                    });
                 }
 
                 Ok(())
@@ -223,9 +231,7 @@ impl LogAnalyzer for LogService {
 
         for log in enabled_logs {
             let lines = self.log_store.extract_lines(&log);
-            for line in lines {
-                self.sender.send((log.clone(), line));
-            }
+            self.sender.send((log.clone(), lines));
         }
     }
 }

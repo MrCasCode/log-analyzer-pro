@@ -70,7 +70,7 @@ pub async fn create_source(source: SourceType, source_address: String) -> Result
 
 #[async_trait]
 pub trait LogSource {
-    async fn run(&self, sender: SyncSender<(String, String)>) -> Result<()>;
+    async fn run(&self, sender: SyncSender<(String, Vec<String>)>) -> Result<()>;
 }
 
 
@@ -81,19 +81,25 @@ pub struct FileSource {
 
 #[async_trait]
 impl LogSource for FileSource {
-    async fn run(&self, sender: SyncSender<(String, String)>) -> Result<()> {
+    async fn run(&self, sender: SyncSender<(String, Vec<String>)>) -> Result<()> {
         let mut read_lines = 0_usize;
+        let capacity = 1_000_000_usize;
         loop {
             let file = File::open(&self.path).await;
             match file {
                 Ok(f) => {
                     let reader = BufReader::with_capacity(2_usize.pow(26), f);
-
+                    let mut v = Vec::with_capacity(capacity);
                     let mut lines = reader.lines().skip(read_lines);
                     while let Some(line) = lines.next().await {
-                        sender.send((self.path.clone(), line?))?;
+                        v.push(line?);
+                        if v.len() == capacity - 1 {
+                            sender.send((self.path.clone(), v))?;
+                            v = Vec::with_capacity(capacity);
+                        }
                         read_lines += 1;
                     }
+                    sender.send((self.path.clone(), v))?;
                 },
                 Err(err) => break,
             }
@@ -115,7 +121,7 @@ pub struct WsSource {
 
 #[async_trait]
 impl LogSource for WsSource {
-    async fn run(&self, sender: SyncSender<(String, String)>) -> Result<()> {
+    async fn run(&self, sender: SyncSender<(String, Vec<String>)>) -> Result<()> {
         unimplemented!()
     }
 }

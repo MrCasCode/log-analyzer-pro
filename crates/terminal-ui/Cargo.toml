@@ -13,5 +13,3 @@ tui = "0.17.0"
 unicode-width = "0.1.9"
 log-analyzer = { path = '../log-analyzer'}
 tui-input = "0.3.0"
-
-

@@ -1,5 +1,5 @@
-use std::{collections::HashMap, sync::Arc, iter::Iterator};
-
+use std::{sync::Arc, iter::Iterator};
+use rustc_hash::FxHashMap as HashMap;
 use std::sync::RwLock;
 
 use crate::services::log_source::LogSource;
@@ -9,6 +9,7 @@ use futures::join;
 pub trait LogStore {
     fn add_log(&self, log_id: &String, log_source: Arc<Box<dyn LogSource + Send + Sync>>, format: &String, enabled: bool);
     fn add_line(&self, log_id: &String, line: &String);
+    fn add_lines(&self, log_id: &String, lines: &Vec<String>);
     fn get_format(&self, log_id: &String) -> Option<String>;
     fn get_logs(&self) -> Vec<(bool, String, String)>;
     fn get_lines(&self, log_id: &String) -> Vec<String>;
@@ -29,10 +30,10 @@ pub struct InMemmoryLogStore {
 impl InMemmoryLogStore {
     pub fn new() -> Self {
         Self {
-            raw_lines : RwLock::new(HashMap::new()),
-            format : RwLock::new(HashMap::new()),
-            enabled : RwLock::new(HashMap::new()),
-            source : RwLock::new(HashMap::new()),
+            raw_lines : RwLock::new(HashMap::default()),
+            format : RwLock::new(HashMap::default()),
+            enabled : RwLock::new(HashMap::default()),
+            source : RwLock::new(HashMap::default()),
         }
     }
 }
@@ -57,6 +58,16 @@ impl LogStore for InMemmoryLogStore {
         }
         let raw_lines = raw_lines_lock.get_mut(log_id).unwrap();
         raw_lines.push(line.clone());
+    }
+
+    fn add_lines(&self, log_id: &String, lines: &Vec<String>) {
+        let mut raw_lines_lock = self.raw_lines.write().unwrap();
+
+        if !raw_lines_lock.contains_key(log_id) {
+            raw_lines_lock.insert(log_id.clone(), Vec::new());
+        }
+        let raw_lines = raw_lines_lock.get_mut(log_id).unwrap();
+        raw_lines.append(&mut lines.clone());
     }
 
     fn get_lines(&self, log_id: &String) -> Vec<String> {

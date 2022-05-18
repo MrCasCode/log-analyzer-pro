@@ -1,29 +1,32 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
-use regex::Regex;
-use std::sync::RwLock;
-
-struct RegexCache {
+use regex::{Regex};
+pub struct RegexCache {
     cache: HashMap<String, Regex>,
 }
 
 impl RegexCache {
     pub fn new() -> Self {
         Self {
-            cache: HashMap::new(),
+            cache: HashMap::default(),
         }
     }
 
-    pub fn get(&mut self, str: &String) -> Option<Regex> {
-        if self.cache.get(str).is_none() {
-            match Regex::new(str) {
-                Ok(re) => {
-                    self.cache.insert(str.clone(), re);
-                }
-                Err(_) => {}
-            }
+    pub fn get(&self, str: &String) -> Option<&Regex> {
+        match self.cache.get(str) {
+            Some(re) => Some(re),
+            None => None
         }
-        Some(self.cache.get(str).unwrap().clone())
+    }
+
+    pub fn put(&mut self, regex: &String) -> Option<Regex>{
+        match Regex::new(regex) {
+            Ok(re) => {
+                self.cache.insert(regex.clone(), re.clone());
+                Some(re)
+            }
+            Err(_) => None
+        }
     }
 }
 
@@ -34,8 +37,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn return_new_regex() {
+    fn no_regex() {
+        let r_cache = RegexCache::new();
+        let r = r_cache.get(&".*".to_string());
+        assert!(r.is_none());
+    }
+
+    #[test]
+    fn put_regex() {
         let mut r_cache = RegexCache::new();
+        r_cache.put(&".*".to_string());
         let r = r_cache.get(&".*".to_string());
         assert!(r.is_some());
     }

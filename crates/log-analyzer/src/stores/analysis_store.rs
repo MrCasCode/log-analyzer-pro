@@ -1,3 +1,5 @@
+use rayon::slice::ParallelSliceMut;
+
 use crate::models::log_line::LogLine;
 use std::sync::{Arc, RwLock};
 
@@ -33,6 +35,7 @@ impl AnalysisStore for InMemmoryAnalysisStore {
         for &line in lines {
             w.push(line.clone());
         }
+        //w.par_sort_unstable_by(|a, b| a.timestamp.trim_start().parse::<f64>().unwrap().partial_cmp(&b.timestamp.trim_start().parse::<f64>().unwrap()).unwrap());
     }
 
     fn add_search_lines(&self, lines: &[&LogLine]) {
@@ -40,6 +43,7 @@ impl AnalysisStore for InMemmoryAnalysisStore {
         for &line in lines {
             w.push(line.clone());
         }
+        //w.par_sort_unstable_by(|a, b| a.timestamp.trim_start().parse::<f64>().unwrap().partial_cmp(&b.timestamp.trim_start().parse::<f64>().unwrap()).unwrap());
     }
 
     fn add_search_query(&self, query: &String) {

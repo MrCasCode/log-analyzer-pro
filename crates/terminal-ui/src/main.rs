@@ -14,7 +14,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log_analyzer::{stores::{log_store::InMemmoryLogStore, processing_store::{InMemmoryProcessingStore, ProcessingStore}, analysis_store::InMemmoryAnalysisStore}, services::log_service::LogService, models::settings::Settings};
+use log_analyzer::{stores::{log_store::InMemmoryLogStore, processing_store::{InMemmoryProcessingStore, ProcessingStore}, analysis_store::InMemmoryAnalysisStore}, services::log_service::{LogService, LogAnalyzer}, models::settings::Settings};
 
 use std::{
     error::Error,
@@ -61,24 +61,25 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
     let processing_store = Arc::new(InMemmoryProcessingStore::new());
     let analysis_store = Arc::new(InMemmoryAnalysisStore::new());
 
+    let log_service = LogService::new(log_store, processing_store, analysis_store);
+
     if let Ok(file) = fs::read_to_string("settings.json") {
         if let Ok(settings) = Settings::from_json(&file) {
             for format in settings.formats {
-                processing_store.add_format(format.alias, format.regex);
+                log_service.add_format(&format.alias, &format.regex);
             }
             for filter in settings.filters {
-                processing_store.add_filter(filter.alias, filter.filter, filter.action, false);
+                //processing_store.add_filter(filter.alias, filter.filter, filter.action, false);
             }
         }
 
     }
 
-    let log_service = LogService::new(log_store, processing_store, analysis_store);
 
 
 
     // create app and run it
-    let tick_rate = Duration::from_millis(100);
+    let tick_rate = Duration::from_millis(10);
     let app = App::new(Box::new(log_service)).await;
     let res = run_app(&mut terminal, app, tick_rate).await;
 

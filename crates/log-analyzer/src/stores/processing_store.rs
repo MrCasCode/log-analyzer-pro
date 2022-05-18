@@ -5,7 +5,7 @@ use crate::models::{
 };
 use std::sync::RwLock;
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 pub trait ProcessingStore {
     fn add_format(&self, id: String, format: String);
@@ -25,8 +25,8 @@ pub struct InMemmoryProcessingStore {
 impl InMemmoryProcessingStore {
     pub fn new() -> Self {
         Self {
-            formats: RwLock::new(HashMap::new()),
-            filters: RwLock::new(HashMap::new()),
+            formats: RwLock::new(HashMap::default()),
+            filters: RwLock::new(HashMap::default()),
         }
     }
 }

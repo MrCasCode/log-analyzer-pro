@@ -1,38 +1,16 @@
-use anyhow::{anyhow, Result};
-use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
-    MouseEvent, MouseEventKind,
-};
-use log_analyzer::models::format::Format;
+use anyhow::Result;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use log_analyzer::models::log_line::LogLine;
-use log_analyzer::services::{
-    log_service::{Event as LogEvent, LogAnalyzer},
-    log_source::SourceType,
-};
+use log_analyzer::services::log_service::LogAnalyzer;
 
-use std::collections::{HashMap, HashSet};
 use std::{
-    error::Error,
-    fmt::{Debug, Display, Formatter},
-    future::Future,
-    io,
     slice::Iter,
-    sync::{mpsc::channel, Arc, RwLock, WaitTimeoutResult},
-    task::Poll,
-    time::{Duration, Instant},
+    sync::{Arc, RwLock},
 };
-use tui::{
-    style::{Color, Modifier, Style},
-    widgets::{ListState, TableState},
-};
-
-use async_std::{
-    channel::{self, Receiver, Sender},
-    sync::Condvar,
-};
+use tui::widgets::{ListState, TableState};
 
 use tui_input::backend::crossterm as input_backend;
-use tui_input::{Input, InputResponse};
+use tui_input::Input;
 
 /* ------ NEW SOURCE INDEXES ------- */
 pub const INDEX_SOURCE_TYPE: usize = 0;
@@ -350,12 +328,25 @@ impl App {
         self.sources = StatefulTable::with_items(Arc::new(RwLock::new(sources)))
     }
 
-    async fn on_event(&mut self) {
+    pub async fn update_filters(&mut self) {
+        let filters: Vec<(bool, String)> = self
+            .log_analyzer
+            .get_filters()
+            .iter()
+            .map(|(enabled, filter)| (*enabled, filter.alias.clone()))
+            .collect();
 
+        let index = self.filters.state.selected();
+        let length: usize = filters.len();
+        self.filters = StatefulTable::with_items(Arc::new(RwLock::new(filters)));
+
+        if index.is_some() && length >= index.unwrap() {
+            self.filters.state.select(index)
+        }
     }
 
-    /// Rotate through the event list.
-    /// This only exists to simulate some kind of "progress"
+    async fn on_event(&mut self) {}
+
     pub async fn on_tick(&mut self) {
         self.on_event().await;
     }
@@ -407,8 +398,8 @@ impl App {
                 if let Some(index) = self.filters.state.selected() {
                     let (_, alias) = &self.filters.items.read().unwrap()[index];
                     self.log_analyzer.toggle_filter(alias);
-
                 }
+                self.update_filters().await;
             }
             // Add new filter -> Popup window
             KeyCode::Char('i') | KeyCode::Char('+') | KeyCode::Char('a') => {
@@ -588,16 +579,22 @@ impl App {
 
     pub fn navigate(&mut self, direction: KeyCode) {
         match self.selected_module {
-            Module::Sources => match direction {
-                KeyCode::Up | KeyCode::Down => self.selected_module = Module::Filters,
-                KeyCode::Left | KeyCode::Right => self.selected_module = Module::Logs,
-                _ => {}
-            },
-            Module::Filters => match direction {
-                KeyCode::Up | KeyCode::Down => self.selected_module = Module::Sources,
-                KeyCode::Left | KeyCode::Right => self.selected_module = Module::Search,
-                _ => {}
-            },
+            Module::Sources => {
+                match direction {
+                    KeyCode::Up | KeyCode::Down => self.selected_module = Module::Filters,
+                    KeyCode::Left | KeyCode::Right => self.selected_module = Module::Logs,
+                    _ => {}
+                };
+                self.sources.unselect()
+            }
+            Module::Filters => {
+                match direction {
+                    KeyCode::Up | KeyCode::Down => self.selected_module = Module::Sources,
+                    KeyCode::Left | KeyCode::Right => self.selected_module = Module::Search,
+                    _ => {}
+                };
+                self.filters.unselect()
+            }
             Module::Logs => match direction {
                 KeyCode::Up => self.selected_module = Module::SearchResult,
                 KeyCode::Down => self.selected_module = Module::Search,
