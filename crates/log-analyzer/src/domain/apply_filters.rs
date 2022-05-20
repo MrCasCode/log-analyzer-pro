@@ -78,32 +78,32 @@ mod tests {
             assert_eq!(filter.color, line.color);
         };
 
-        let line = LogLine {date: "2022-01-02".to_string(), timestamp: "200.05".to_string(), app: "python".to_string(), severity: "INFO".to_string(), function: "call".to_string(), payload: "some useful information".to_string(), color: None};
+        let line = LogLine {index: "0".to_string(), date: "2022-01-02".to_string(), timestamp: "200.05".to_string(), app: "python".to_string(), severity: "INFO".to_string(), function: "call".to_string(), payload: "some useful information".to_string(), color: None};
 
-        let mut filter = LogLine {date: "2022-01-".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((255, 0, 0))};
+        let mut filter = LogLine {index: "0".to_string(), date: "2022-01-".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((255, 0, 0))};
         run_test(filter, line.clone());
 
-        filter = LogLine {date: "".to_string(), timestamp: "200".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((254, 0, 0))};
+        filter = LogLine {index: "0".to_string(), date: "".to_string(), timestamp: "200".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((254, 0, 0))};
         run_test(filter, line.clone());
 
-        filter = LogLine {date: "".to_string(), timestamp: "".to_string(), app: "python".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((253, 0, 0))};
+        filter = LogLine {index: "0".to_string(), date: "".to_string(), timestamp: "".to_string(), app: "python".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((253, 0, 0))};
         run_test(filter, line.clone());
 
-        filter = LogLine {date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "INFO".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((252, 0, 0))};
+        filter = LogLine {index: "0".to_string(), date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "INFO".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((252, 0, 0))};
         run_test(filter, line.clone());
 
-        filter = LogLine {date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "call".to_string(), payload: "".to_string(), color: Some((251, 0, 0))};
+        filter = LogLine {index: "0".to_string(), date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "call".to_string(), payload: "".to_string(), color: Some((251, 0, 0))};
         run_test(filter, line.clone());
 
-        filter = LogLine {date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "some use".to_string(), color: Some((250, 0, 0))};
+        filter = LogLine {index: "0".to_string(), date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "some use".to_string(), color: Some((250, 0, 0))};
         run_test(filter, line.clone());
     }
 
 
     #[test]
     fn dont_match_on_multiple_conditions_unsatisfied() {
-        let mut line = LogLine {date: "2022-01-02".to_string(), timestamp: "200.05".to_string(), app: "python".to_string(), severity: "INFO".to_string(), function: "call".to_string(), payload: "some useful information".to_string(), color: None};
-        let filter = LogLine {date: "2022-01-".to_string(), timestamp: "100".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((255, 0, 0))};
+        let mut line = LogLine {index: "0".to_string(), date: "2022-01-02".to_string(), timestamp: "200.05".to_string(), app: "python".to_string(), severity: "INFO".to_string(), function: "call".to_string(), payload: "some useful information".to_string(), color: None};
+        let filter = LogLine {index: "0".to_string(), date: "2022-01-".to_string(), timestamp: "100".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: Some((255, 0, 0))};
 
         let is_match = filter_line(&filter, &mut line);
         assert_eq!(is_match, false);

@@ -35,7 +35,7 @@ async fn async_main() -> Result<()> {
     log_service.add_log(
         SourceType::FILE.into(),
         &file,
-        &"".to_string(),
+        None,
     ).await;
 
     loop {

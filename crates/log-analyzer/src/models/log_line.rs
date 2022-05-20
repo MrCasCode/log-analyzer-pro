@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct LogLine {
+    pub index: String,
     pub date: String,
     pub timestamp: String,
     pub app: String,
@@ -15,6 +16,7 @@ pub struct LogLine {
 impl LogLine {
    pub fn columns() -> Vec<String> {
         vec![
+            "Index".to_string(),
             "Date".to_string(),
             "Timestamp".to_string(),
             "App".to_string(),
@@ -26,6 +28,7 @@ impl LogLine {
 
     pub fn get(&self, key: &str) -> Option<&String> {
         match key {
+            "Index" => Some(&self.index),
             "Date" => Some(&self.date),
             "Timestamp" => Some(&self.timestamp),
             "App" => Some(&self.app),

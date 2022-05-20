@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn serialize() {
-        let filter = Filter{alias: "All".into(), action: FilterAction::MARKER, filter: LogLine { date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: None }};
+        let filter = Filter{alias: "All".into(), action: FilterAction::MARKER, filter: LogLine {index: "0".to_string(), date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: None }};
         let json = serde_json::to_string(&filter);
         assert!(json.is_ok())
     }

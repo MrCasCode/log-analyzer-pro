@@ -214,7 +214,7 @@ pub struct App {
     pub filter_color: usize,
 
     // Display all log sources in the sources panel
-    pub sources: StatefulTable<(bool, String, String)>,
+    pub sources: StatefulTable<(bool, String, Option<String>)>,
     // Display all filters in the filters panel
     pub filters: StatefulTable<(bool, String)>,
 
@@ -289,25 +289,30 @@ impl App {
     pub async fn add_log(&mut self) -> Result<()> {
         let selected_format_index = self.formats.state.selected().unwrap(); // There is always one item selected
 
-        let alias: String;
-        // New
-        if selected_format_index == 0 {
-            alias = self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS]
-                .value()
-                .to_string();
-            let regex = self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX]
-                .value()
-                .to_string();
+        let alias = match selected_format_index {
+            0 /* NEW */ => {
+                let alias = self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS]
+                    .value()
+                    .to_string();
+                let regex = self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX]
+                    .value()
+                    .to_string();
 
-            self.log_analyzer.add_format(&alias, &regex)?;
-            self.update_formats().await;
-        } else {
-            alias = self.formats.items[selected_format_index].clone();
-        }
+                if alias.len() > 0 {
+                    self.log_analyzer.add_format(&alias, &regex)?;
+                    self.update_formats().await;
+                    Some(alias)
+                } else {
+                    None
+                }
+
+            },
+            _ => Some(self.formats.items[selected_format_index].clone())
+        };
 
         let path = self.input_buffers[INDEX_SOURCE_PATH].value().to_string();
         self.log_analyzer
-            .add_log(self.source_type, &path, &alias)
+            .add_log(self.source_type, &path, alias.as_ref())
             .await?;
 
         Ok(())
@@ -578,6 +583,7 @@ impl App {
                         alias: self.input_buffers[INDEX_FILTER_NAME].value().to_string(),
                         action: FilterAction::from(self.filter_type),
                         filter: LogLine {
+                            index: "".to_string(),
                             date: self.input_buffers[INDEX_FILTER_DATETIME]
                                 .value()
                                 .to_string(),
@@ -752,13 +758,13 @@ async fn handle_table_input<T>(
         KeyCode::Left => *horizontal_offset -= if *horizontal_offset == 0 { 0 } else { 10 },
         // Navigate down log_lines
         KeyCode::Right => *horizontal_offset += 10,
-        //KeyCode::Char('I') | KeyCode::Char('i') => log_columns[0].1 = !log_columns[0].1,
-        KeyCode::Char('D') | KeyCode::Char('d') => log_columns[0].1 = !log_columns[0].1,
-        KeyCode::Char('T') | KeyCode::Char('t') => log_columns[1].1 = !log_columns[1].1,
-        KeyCode::Char('A') | KeyCode::Char('a') => log_columns[2].1 = !log_columns[2].1,
-        KeyCode::Char('S') | KeyCode::Char('s') => log_columns[3].1 = !log_columns[3].1,
-        KeyCode::Char('F') | KeyCode::Char('f') => log_columns[4].1 = !log_columns[4].1,
-        KeyCode::Char('P') | KeyCode::Char('p') => log_columns[5].1 = !log_columns[5].1,
+        KeyCode::Char('I') | KeyCode::Char('i') => log_columns[0].1 = !log_columns[0].1,
+        KeyCode::Char('D') | KeyCode::Char('d') => log_columns[1].1 = !log_columns[1].1,
+        KeyCode::Char('T') | KeyCode::Char('t') => log_columns[2].1 = !log_columns[2].1,
+        KeyCode::Char('A') | KeyCode::Char('a') => log_columns[3].1 = !log_columns[3].1,
+        KeyCode::Char('S') | KeyCode::Char('s') => log_columns[4].1 = !log_columns[4].1,
+        KeyCode::Char('F') | KeyCode::Char('f') => log_columns[5].1 = !log_columns[5].1,
+        KeyCode::Char('P') | KeyCode::Char('p') => log_columns[6].1 = !log_columns[6].1,
 
         // Nothing
         _ => {}

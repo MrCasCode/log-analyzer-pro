@@ -44,10 +44,15 @@ where
             false => Span::styled("X", Style::default().fg(Color::Gray)),
         };
 
+        let format = match &item.2 {
+            Some(format) => format.as_str(),
+            _ => ""
+        };
+
         let cells = vec![
             Cell::from(get_enabled_widget(item.0)),
             Cell::from(Text::from(item.1.as_str())),
-            Cell::from(Text::from(item.2.as_str())),
+            Cell::from(Text::from(format)),
         ];
         Row::new(cells).bottom_margin(0)
     });
