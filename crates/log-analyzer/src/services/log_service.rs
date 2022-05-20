@@ -41,6 +41,7 @@ pub trait LogAnalyzer {
     ) -> Result<()>;
     fn add_format(&self, alias: &String, regex: &String) -> Result<()>;
     fn add_search(&self, regex: &String) -> Result<()>;
+    fn add_filter(&self, filter: Filter);
     fn get_log(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_logs(&self) -> Vec<(bool, String, String)>;
@@ -85,7 +86,6 @@ impl LogService {
                         .filter_map(|(path, line)| log.apply_filters(path, line))
                         .for_each(|(path, line)| log.apply_search(path, line));
                     }
-                    println!("processed {} in {}", log.get_log().read().unwrap().len(), now.elapsed().as_millis());
                 }
             }
         });
@@ -195,6 +195,10 @@ impl LogAnalyzer for LogService {
                 "Could not compile regex.\nPlease review regex syntax"
             )),
         }
+    }
+
+    fn add_filter(&self, filter: Filter) {
+        self.processing_store.add_filter(filter.alias, filter.filter, filter.action, false);
     }
 
     fn get_log(&self) -> Arc<RwLock<Vec<LogLine>>> {

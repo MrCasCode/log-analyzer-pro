@@ -1,6 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use log_analyzer::models::log_line::LogLine;
+use log_analyzer::models::filter::FilterAction;
+use log_analyzer::models::{filter::Filter, log_line::LogLine};
 use log_analyzer::services::log_service::LogAnalyzer;
 
 use std::{
@@ -22,14 +23,16 @@ pub const INDEX_SOURCE_OK_BUTTON: usize = INDEX_SOURCE_NEW_FORMAT_REGEX + 1;
 /* ------ FILTER INDEXES ------- */
 pub const INDEX_FILTER_NAME: usize = INDEX_SOURCE_OK_BUTTON + 1;
 pub const INDEX_FILTER_TYPE: usize = INDEX_FILTER_NAME + 1;
-pub const INDEX_FILTER_COLOR: usize = INDEX_FILTER_TYPE + 1;
-pub const INDEX_FILTER_DATETIME: usize = INDEX_FILTER_COLOR + 1;
+pub const INDEX_FILTER_DATETIME: usize = INDEX_FILTER_TYPE + 1;
 pub const INDEX_FILTER_TIMESTAMP: usize = INDEX_FILTER_DATETIME + 1;
 pub const INDEX_FILTER_APP: usize = INDEX_FILTER_TIMESTAMP + 1;
 pub const INDEX_FILTER_SEVERITY: usize = INDEX_FILTER_APP + 1;
 pub const INDEX_FILTER_FUNCTION: usize = INDEX_FILTER_SEVERITY + 1;
 pub const INDEX_FILTER_PAYLOAD: usize = INDEX_FILTER_FUNCTION + 1;
-pub const INDEX_FILTER_OK_BUTTON: usize = INDEX_FILTER_PAYLOAD + 1;
+pub const INDEX_FILTER_RED_COLOR: usize = INDEX_FILTER_PAYLOAD + 1;
+pub const INDEX_FILTER_GREEN_COLOR: usize = INDEX_FILTER_RED_COLOR + 1;
+pub const INDEX_FILTER_BLUE_COLOR: usize = INDEX_FILTER_GREEN_COLOR + 1;
+pub const INDEX_FILTER_OK_BUTTON: usize = INDEX_FILTER_BLUE_COLOR + 1;
 /* ------ SEARCH INDEXES ------- */
 pub const INDEX_SEARCH: usize = INDEX_FILTER_OK_BUTTON + 1;
 /* ----------------------------------- */
@@ -508,19 +511,17 @@ impl App {
             }
             INDEX_SOURCE_OK_BUTTON => {
                 if key.code == KeyCode::Enter {
-                    if self.input_buffer_index == INDEX_SOURCE_OK_BUTTON {
-                        match self.add_log().await {
-                            Ok(_) => {
-                                self.show_source_popup = false;
-                                self.selected_module = Module::Sources;
-                                self.update_sources().await;
-                            }
-                            Err(err) => {
-                                self.selected_module = Module::ErrorPopup;
-                                self.show_error_message = true;
-                                self.popup.message = format!("{:?}", err);
-                                self.popup.calling_module = Module::SourcePopup;
-                            }
+                    match self.add_log().await {
+                        Ok(_) => {
+                            self.show_source_popup = false;
+                            self.selected_module = Module::Sources;
+                            self.update_sources().await;
+                        }
+                        Err(err) => {
+                            self.selected_module = Module::ErrorPopup;
+                            self.show_error_message = true;
+                            self.popup.message = format!("{:?}", err);
+                            self.popup.calling_module = Module::SourcePopup;
                         }
                     }
                 }
@@ -530,6 +531,13 @@ impl App {
     }
 
     async fn handle_filter_popup_input(&mut self, key: KeyEvent) {
+        // Add new filter -> Popup window
+        if key.code == KeyCode::Esc {
+            self.show_filter_popup = false;
+            self.selected_module = Module::Filters;
+            return ();
+        }
+
         match self.input_buffer_index {
             index @ (INDEX_FILTER_NAME
             | INDEX_FILTER_DATETIME
@@ -537,12 +545,15 @@ impl App {
             | INDEX_FILTER_APP
             | INDEX_FILTER_SEVERITY
             | INDEX_FILTER_FUNCTION
-            | INDEX_FILTER_PAYLOAD) => {
+            | INDEX_FILTER_PAYLOAD
+            | INDEX_FILTER_RED_COLOR
+            | INDEX_FILTER_GREEN_COLOR
+            | INDEX_FILTER_BLUE_COLOR) => {
                 input_backend::to_input_request(Event::Key(key))
                     .and_then(|req| Some(self.input_buffers[index].handle(req)));
                 ()
             }
-            index @ (INDEX_FILTER_TYPE | INDEX_FILTER_COLOR) => {
+            INDEX_FILTER_TYPE => {
                 // Switch tabs
                 if key.code == KeyCode::Right || key.code == KeyCode::Left {
                     let circular_choice = |i: &mut usize, max, add: i32| {
@@ -556,12 +567,44 @@ impl App {
                     let sum = if key.code == KeyCode::Right { 1 } else { -1 };
                     match self.input_buffer_index {
                         INDEX_FILTER_TYPE => circular_choice(&mut self.filter_type, 2, sum),
-                        INDEX_FILTER_COLOR => circular_choice(&mut self.filter_color, 14, sum),
                         _ => {}
                     }
                 }
             }
-            INDEX_FILTER_OK_BUTTON => {}
+
+            INDEX_FILTER_OK_BUTTON => {
+                if key.code == KeyCode::Enter {
+                    let filter = Filter {
+                        alias: self.input_buffers[INDEX_FILTER_NAME].value().to_string(),
+                        action: FilterAction::from(self.filter_type),
+                        filter: LogLine {
+                            date: self.input_buffers[INDEX_FILTER_DATETIME]
+                                .value()
+                                .to_string(),
+                            timestamp: self.input_buffers[INDEX_FILTER_TIMESTAMP]
+                                .value()
+                                .to_string(),
+                            app: self.input_buffers[INDEX_FILTER_APP].value().to_string(),
+                            severity: self.input_buffers[INDEX_FILTER_SEVERITY]
+                                .value()
+                                .to_string(),
+                            function: self.input_buffers[INDEX_FILTER_FUNCTION]
+                                .value()
+                                .to_string(),
+                            payload: self.input_buffers[INDEX_FILTER_PAYLOAD].value().to_string(),
+                            color: parse_color(
+                                self.input_buffers[INDEX_FILTER_RED_COLOR].value(),
+                                self.input_buffers[INDEX_FILTER_GREEN_COLOR].value(),
+                                self.input_buffers[INDEX_FILTER_BLUE_COLOR].value(),
+                            ),
+                        },
+                    };
+                    self.log_analyzer.add_filter(filter);
+                    self.show_filter_popup = false;
+                    self.selected_module = Module::Filters;
+                    self.update_filters().await;
+                }
+            }
             _ => {}
         }
     }
@@ -719,5 +762,22 @@ async fn handle_table_input<T>(
 
         // Nothing
         _ => {}
+    }
+}
+
+pub fn parse_color(r: &str, g: &str, b: &str) -> Option<(u8, u8, u8)> {
+    match (r.parse::<u8>(), g.parse::<u8>(), b.parse::<u8>()) {
+        parse
+            if [&parse.0, &parse.1, &parse.2]
+                .into_iter()
+                .any(|p| p.is_ok()) =>
+        {
+            Some((
+                parse.0.unwrap_or_default(),
+                parse.1.unwrap_or_default(),
+                parse.2.unwrap_or_default(),
+            ))
+        }
+        _ => None,
     }
 }

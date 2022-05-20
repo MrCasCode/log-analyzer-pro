@@ -12,6 +12,16 @@ pub enum FilterAction {
     EXCLUDE
 }
 
+impl From<usize> for FilterAction {
+    fn from(v: usize) -> Self {
+        match v {
+            0 => FilterAction::INCLUDE,
+            1 => FilterAction::EXCLUDE,
+            _ => FilterAction::MARKER,
+        }
+    }
+}
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Filter {

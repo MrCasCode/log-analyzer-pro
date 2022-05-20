@@ -43,7 +43,9 @@ impl AnalysisStore for InMemmoryAnalysisStore {
         for &line in lines {
             w.push(line.clone());
         }
-        //w.par_sort_unstable_by(|a, b| a.timestamp.trim_start().parse::<f64>().unwrap().partial_cmp(&b.timestamp.trim_start().parse::<f64>().unwrap()).unwrap());
+        if lines[0].timestamp.len() != 0 {
+            w.par_sort_unstable_by(|a, b| a.timestamp.trim_start().parse::<f64>().unwrap().partial_cmp(&b.timestamp.trim_start().parse::<f64>().unwrap()).unwrap());
+        }
     }
 
     fn add_search_query(&self, query: &String) {

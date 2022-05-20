@@ -1,8 +1,9 @@
 use crate::{
     app::{
-        App, INDEX_FILTER_APP, INDEX_FILTER_COLOR, INDEX_FILTER_DATETIME, INDEX_FILTER_FUNCTION,
-        INDEX_FILTER_NAME, INDEX_FILTER_PAYLOAD, INDEX_FILTER_SEVERITY, INDEX_FILTER_TIMESTAMP,
-        INDEX_FILTER_TYPE,
+        App, INDEX_FILTER_APP, INDEX_FILTER_BLUE_COLOR, INDEX_FILTER_DATETIME,
+        INDEX_FILTER_FUNCTION, INDEX_FILTER_GREEN_COLOR, INDEX_FILTER_NAME, INDEX_FILTER_OK_BUTTON,
+        INDEX_FILTER_PAYLOAD, INDEX_FILTER_RED_COLOR, INDEX_FILTER_SEVERITY,
+        INDEX_FILTER_TIMESTAMP, INDEX_FILTER_TYPE, parse_color,
     },
     styles::SELECTED_STYLE,
 };
@@ -67,55 +68,84 @@ fn draw_color_selector<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: us
 where
     B: Backend,
 {
-    let colors = [
-        Color::LightYellow,
-        Color::Yellow,
-        Color::LightRed,
-        Color::Red,
-        Color::LightGreen,
-        Color::Green,
-        Color::LightCyan,
-        Color::Cyan,
-        Color::LightBlue,
-        Color::Blue,
-        Color::LightMagenta,
-        Color::Magenta,
-        Color::Black,
-        Color::DarkGray,
-        Color::Gray,
-    ];
+    let color_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(60),
+                Constraint::Max(3),
+            ]
+            .as_ref(),
+        )
+        .margin(0)
+        .split(area);
+    draw_input_field(f, app, color_layout[0], INDEX_FILTER_RED_COLOR, "Red");
+    draw_input_field(f, app, color_layout[1], INDEX_FILTER_GREEN_COLOR, "Green");
+    draw_input_field(f, app, color_layout[2], INDEX_FILTER_BLUE_COLOR, "Blue");
 
-    let choices: Vec<Spans> = colors
-        .iter()
-        .map(|c| {
-            Spans::from(vec![
-                Span::styled("|X|", Style::default().bg(*c).fg(*c)),
-            ])
-        })
-        .collect();
+    let w = Block::default().borders(Borders::ALL);
+    let color = match parse_color(
+        app.input_buffers[INDEX_FILTER_RED_COLOR].value(),
+        app.input_buffers[INDEX_FILTER_GREEN_COLOR].value(),
+        app.input_buffers[INDEX_FILTER_BLUE_COLOR].value(),
+    ) {
+        Some((r, g, b)) => Color::Rgb(r, g, b),
+        _ => Color::Reset,
+    };
 
-    let source_type_widget = Tabs::new(choices)
-        .block(Block::default().borders(Borders::ALL).title(title))
-        .select(app.filter_color)
-        .style(match index == app.input_buffer_index {
+    //let (r, g, b) = app.input_buffers[INDEX_FILTER_RED_COLOR].value().parse(), app.input_buffers[INDEX_FILTER_GREEN_COLOR].value(), app.input_buffers[INDEX_FILTER_BLUE_COLOR].value()
+    let w_color = Paragraph::new(if color == Color::Reset {
+        "No color"
+    } else {
+        ""
+    })
+    .block(Block::default().style(Style::default().bg(color)));
+
+    f.render_widget(w_color, w.inner(color_layout[3]));
+}
+
+fn draw_separator<B>(f: &mut Frame<B>, app: &App, title: &str, area: Rect, offset: &mut usize)
+where
+    B: Backend,
+{
+    *offset += 1;
+    f.render_widget(
+        Block::default()
+            .borders(Borders::TOP)
+            .title(title)
+            .title_alignment(Alignment::Center),
+        area,
+    );
+}
+
+fn draw_ok_button<B>(f: &mut Frame<B>, app: &App, area: Rect)
+where
+    B: Backend,
+{
+    let ok_button_widget = Paragraph::new("OK")
+        .style(match INDEX_FILTER_OK_BUTTON == app.input_buffer_index {
             false => Style::default(),
             true => SELECTED_STYLE,
         })
-        .highlight_style(SELECTED_STYLE.fg(Color::White));
-
-    f.render_widget(source_type_widget, area);
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL));
+    f.render_widget(ok_button_widget, area);
 }
 
 pub fn draw_filter_popup<B>(f: &mut Frame<B>, app: &mut App)
 where
     B: Backend,
 {
+    let mut offset = 0_usize;
     let block = Block::default()
         .title("Filter")
         .borders(Borders::ALL)
         .border_style(SELECTED_STYLE);
 
-    let area = centered_rect(60, 35, f.size());
+    let area = centered_rect(60, 36, f.size());
     f.render_widget(Clear, area); //this clears out the background
     f.render_widget(block, area);
 
@@ -128,15 +158,18 @@ where
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Max(3),
-                Constraint::Max(3),
-                Constraint::Max(3),
-                Constraint::Max(3),
-                Constraint::Max(3),
-                Constraint::Max(3),
-                Constraint::Max(3),
-                Constraint::Max(3),
-                Constraint::Max(3),
+                Constraint::Max(3), // Name
+                Constraint::Max(3), // Type
+                Constraint::Max(1), // Separator
+                Constraint::Max(3), // Filter input
+                Constraint::Max(3), // Filter input
+                Constraint::Max(3), // Filter input
+                Constraint::Max(3), // Filter input
+                Constraint::Max(3), // Filter input
+                Constraint::Max(3), // Filter input
+                Constraint::Max(1), // Separator
+                Constraint::Max(3), // Color
+                Constraint::Max(2), // Ok
             ]
             .as_ref(),
         )
@@ -146,64 +179,80 @@ where
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_NAME - INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_NAME - INDEX_FILTER_NAME + offset],
         INDEX_FILTER_NAME,
         "Name",
     );
     draw_filter_type_selector(
         f,
         app,
-        popup_layout[INDEX_FILTER_TYPE - INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_TYPE - INDEX_FILTER_NAME + offset],
         INDEX_FILTER_TYPE,
         "Type",
     );
-    draw_color_selector(
+
+    draw_separator(
         f,
         app,
-        popup_layout[INDEX_FILTER_COLOR - INDEX_FILTER_NAME],
-        INDEX_FILTER_COLOR,
-        "Color",
+        "Filter",
+        popup_layout[INDEX_FILTER_DATETIME - INDEX_FILTER_NAME + offset],
+        &mut offset,
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_DATETIME - INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_DATETIME - INDEX_FILTER_NAME + offset],
         INDEX_FILTER_DATETIME,
         "Datetime",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_TIMESTAMP - INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_TIMESTAMP - INDEX_FILTER_NAME + offset],
         INDEX_FILTER_TIMESTAMP,
         "Timestamp",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_APP - INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_APP - INDEX_FILTER_NAME + offset],
         INDEX_FILTER_APP,
         "App",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_SEVERITY - INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_SEVERITY - INDEX_FILTER_NAME + offset],
         INDEX_FILTER_SEVERITY,
         "Severity",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_FUNCTION - INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_FUNCTION - INDEX_FILTER_NAME + offset],
         INDEX_FILTER_FUNCTION,
         "Function",
     );
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_PAYLOAD - INDEX_FILTER_NAME],
+        popup_layout[INDEX_FILTER_PAYLOAD - INDEX_FILTER_NAME + offset],
         INDEX_FILTER_PAYLOAD,
         "Payload",
     );
+    draw_separator(
+        f,
+        app,
+        "Color",
+        popup_layout[INDEX_FILTER_RED_COLOR - INDEX_FILTER_NAME + offset],
+        &mut offset,
+    );
+    draw_color_selector(
+        f,
+        app,
+        popup_layout[INDEX_FILTER_RED_COLOR - INDEX_FILTER_NAME + offset],
+        INDEX_FILTER_RED_COLOR,
+        "Color",
+    );
+    draw_ok_button(f, app, popup_layout[popup_layout.len() - 1])
 }

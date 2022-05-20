@@ -9,7 +9,7 @@ pub struct LogLine {
     pub severity: String,
     pub function: String,
     pub payload: String,
-    pub color: Option<u32>,
+    pub color: Option<(u8, u8, u8)>,
 }
 
 impl LogLine {

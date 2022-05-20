@@ -92,7 +92,7 @@ where
 
         let cells = vec![
             Cell::from(get_enabled_widget(item.0)),
-            Cell::from(Text::from(item.1.as_str()))
+            Cell::from(Text::from(item.1.as_str())),
         ];
         Row::new(cells).bottom_margin(0)
     });
@@ -100,10 +100,7 @@ where
         .header(header)
         .block(filters_widget)
         .highlight_style(selected_style)
-        .widths(&[
-            Constraint::Percentage(20),
-            Constraint::Percentage(80),
-        ]);
+        .widths(&[Constraint::Percentage(20), Constraint::Percentage(80)]);
     f.render_stateful_widget(t, area, &mut app.filters.state);
 }
 
@@ -160,7 +157,15 @@ fn draw_log<B>(
                     .unwrap()
                     .get(horizontal_offset..)
                     .unwrap_or_default(),
-                Style::default(),
+                Style::default().fg(if item.color.is_some() {
+                    Color::Rgb(
+                        item.color.unwrap().0,
+                        item.color.unwrap().1,
+                        item.color.unwrap().2,
+                    )
+                } else {
+                    Color::Reset
+                }),
             ))
         });
         Row::new(cells).bottom_margin(0)
