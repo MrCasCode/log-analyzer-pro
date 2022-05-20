@@ -35,10 +35,12 @@ pub trait LogAnalyzer {
         format: Option<&String>,
     ) -> Result<()>;
     fn add_format(&self, alias: &String, regex: &String) -> Result<()>;
-    fn add_search(&self, regex: &String) -> Result<()>;
+    fn add_search(&self, regex: &String);
     fn add_filter(&self, filter: Filter);
     fn get_log(&self) -> Arc<RwLock<Vec<LogLine>>>;
+    fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
     fn get_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
+    fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)>;
     fn get_formats(&self) -> Vec<Format>;
     fn get_filters(&self) -> Vec<(bool, Filter)>;
@@ -169,7 +171,7 @@ impl LogAnalyzer for LogService {
         Ok(())
     }
 
-    fn add_search(&self, regex: &String) -> Result<()> {
+    fn add_search(&self, regex: &String) {
         let re = Regex::new(&regex);
         match re {
             Ok(_) => {
@@ -186,12 +188,8 @@ impl LogAnalyzer for LogService {
                         }
                     });
                 }
-
-                Ok(())
             }
-            Err(_) => Err(anyhow!(
-                "Could not compile regex.\nPlease review regex syntax"
-            )),
+            Err(_) => {}
         }
     }
 
@@ -203,8 +201,16 @@ impl LogAnalyzer for LogService {
         self.analysis_store.fetch_log()
     }
 
+    fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine> {
+        self.analysis_store.get_log_lines(from, to)
+    }
+
     fn get_search(&self) -> Arc<RwLock<Vec<LogLine>>> {
         self.analysis_store.fetch_search()
+    }
+
+    fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine> {
+        self.analysis_store.get_search_lines(from, to)
     }
 
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)> {

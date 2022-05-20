@@ -5,13 +5,16 @@ use log_analyzer::models::{filter::Filter, log_line::LogLine};
 use log_analyzer::services::log_service::LogAnalyzer;
 
 use std::{
-    slice::Iter,
     sync::{Arc, RwLock},
 };
-use tui::widgets::{ListState, TableState};
 
 use tui_input::backend::crossterm as input_backend;
 use tui_input::Input;
+
+use crate::data::Stateful;
+use crate::data::lazy_stateful_table::{LazySource, LazyStatefulTable};
+use crate::data::stateful_list::StatefulList;
+use crate::data::stateful_table::StatefulTable;
 
 /* ------ NEW SOURCE INDEXES ------- */
 pub const INDEX_SOURCE_TYPE: usize = 0;
@@ -58,132 +61,22 @@ pub enum Module {
     None,
 }
 
-/* Supported directions of scrolling */
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ScrollDirection {
-    Up,
-    Down,
-    Left,
-    Right,
-    Top,
-    Bottom,
+struct LogSourcer {
+    log_analyzer: Box<Arc<dyn LogAnalyzer>>
 }
 
-impl ScrollDirection {
-    /**
-     * Return iterator of the available scroll directions.
-     *
-     * @return Iter
-     */
-    #[allow(dead_code)]
-    pub fn iter() -> Iter<'static, ScrollDirection> {
-        [
-            ScrollDirection::Up,
-            ScrollDirection::Down,
-            ScrollDirection::Left,
-            ScrollDirection::Right,
-            ScrollDirection::Top,
-            ScrollDirection::Bottom,
-        ]
-        .iter()
+impl LazySource<LogLine> for LogSourcer {
+    fn source(&self, from: usize, to: usize) -> Vec<LogLine> {
+        self.log_analyzer.get_log_lines(from, to)
     }
 }
-
-pub struct StatefulTable<T> {
-    pub state: TableState,
-    pub items: Arc<RwLock<Vec<T>>>,
+struct SearchSourcer {
+    log_analyzer: Box<Arc<dyn LogAnalyzer>>
 }
 
-impl<T> StatefulTable<T> {
-    fn with_items(items: Arc<RwLock<Vec<T>>>) -> StatefulTable<T> {
-        StatefulTable {
-            state: TableState::default(),
-            items,
-        }
-    }
-
-    fn next(&mut self) {
-        if self.items.read().unwrap().len() > 0 {
-            let i = match self.state.selected() {
-                Some(i) => {
-                    if i >= self.items.read().unwrap().len() - 1 {
-                        0
-                    } else {
-                        i + 1
-                    }
-                }
-                None => 0,
-            };
-            self.state.select(Some(i));
-        }
-    }
-
-    fn previous(&mut self) {
-        if self.items.read().unwrap().len() > 0 {
-            let i = match self.state.selected() {
-                Some(i) => {
-                    if i == 0 {
-                        self.items.read().unwrap().len() - 1
-                    } else {
-                        i - 1
-                    }
-                }
-                None => 0,
-            };
-            self.state.select(Some(i));
-        }
-    }
-
-    fn unselect(&mut self) {
-        self.state.select(None);
-    }
-}
-
-pub struct StatefulList<T> {
-    pub state: ListState,
-    pub items: Vec<T>,
-}
-
-impl<T> StatefulList<T> {
-    fn with_items(items: Vec<T>) -> StatefulList<T> {
-        StatefulList {
-            state: ListState::default(),
-            items,
-        }
-    }
-
-    fn next(&mut self) -> usize {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.items.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-        i
-    }
-
-    fn previous(&mut self) -> usize {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.items.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-        i
-    }
-
-    fn unselect(&mut self) {
-        self.state.select(None);
+impl LazySource<LogLine> for SearchSourcer {
+    fn source(&self, from: usize, to: usize) -> Vec<LogLine> {
+        self.log_analyzer.get_search_lines(from, to)
     }
 }
 
@@ -218,8 +111,8 @@ pub struct App {
     // Display all filters in the filters panel
     pub filters: StatefulTable<(bool, String)>,
 
-    pub log_lines: StatefulTable<LogLine>,
-    pub search_lines: StatefulTable<LogLine>,
+    pub log_lines: LazyStatefulTable<LogLine>,
+    pub search_lines: LazyStatefulTable<LogLine>,
     pub horizontal_offset: usize,
 
     pub log_columns: Vec<(String, bool)>,
@@ -247,8 +140,9 @@ impl App {
                 .map(|(enabled, filter)| (*enabled, filter.alias.clone()))
                 .collect(),
         ));
-        let log_lines = log_analyzer.get_log();
-        let search_lines = log_analyzer.get_search();
+
+        let log_sourcer = LogSourcer {log_analyzer: log_analyzer.clone()};
+        let search_sourcer = SearchSourcer {log_analyzer: log_analyzer.clone()};
 
         App {
             log_analyzer,
@@ -269,8 +163,8 @@ impl App {
             sources: StatefulTable::with_items(sources),
             filters: StatefulTable::with_items(filters),
 
-            log_lines: StatefulTable::with_items(log_lines),
-            search_lines: StatefulTable::with_items(search_lines),
+            log_lines: LazyStatefulTable::new(Box::new(log_sourcer)),
+            search_lines: LazyStatefulTable::new(Box::new(search_sourcer)),
             horizontal_offset: 0,
             log_columns: LogLine::columns()
                 .into_iter()
@@ -449,14 +343,14 @@ impl App {
                     .add_search(&self.input_buffers[INDEX_SEARCH].value().into());
             }
             _ => {
-                let response = input_backend::to_input_request(Event::Key(key))
+                let _ = input_backend::to_input_request(Event::Key(key))
                     .and_then(|req| Some(self.input_buffers[INDEX_SEARCH].handle(req)));
             }
         }
     }
 
     async fn handle_source_popup_input(&mut self, key: KeyEvent) {
-        let mut fill_format = |i: usize, current_format: &str| match current_format {
+        let mut fill_format = |_: usize, current_format: &str| match current_format {
             "New" => {
                 self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS] = Input::default();
                 self.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX] = Input::default();
@@ -714,8 +608,8 @@ impl App {
     }
 }
 
-async fn handle_table_input<T>(
-    table: &mut StatefulTable<T>,
+async fn handle_table_input<R, T: Stateful<R>>(
+    table: &mut T,
     log_columns: &mut Vec<(String, bool)>,
     horizontal_offset: &mut usize,
     key: KeyEvent,

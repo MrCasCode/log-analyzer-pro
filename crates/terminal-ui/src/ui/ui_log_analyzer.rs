@@ -9,9 +9,9 @@ use tui::{
 };
 
 use crate::{
-    app::{Module, StatefulTable, INDEX_SEARCH},
+    app::{Module, INDEX_SEARCH},
     styles::{SELECTED_COLOR, SELECTED_STYLE},
-    App,
+    App, data::{stateful_table::StatefulTable, lazy_stateful_table::LazyStatefulTable},
 };
 
 use super::ui_shared::display_cursor;
@@ -125,7 +125,7 @@ where
 fn draw_log<B>(
     f: &mut Frame<B>,
     is_selected: bool,
-    items: &mut StatefulTable<LogLine>,
+    items: &mut LazyStatefulTable<LogLine>,
     log_columns: &Vec<(String, bool)>,
     title: &str,
     horizontal_offset: usize,
@@ -154,8 +154,7 @@ fn draw_log<B>(
         .map(|(column, _)| Cell::from(column.clone()).style(Style::default().fg(Color::Black)));
     let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
 
-    let r = items.items.read().unwrap();
-    let rows = r.iter().map(|item| {
+    let rows = items.items.iter().map(|item| {
         let cells = enabled_columns.iter().map(|(column, _)| {
             Cell::from(Span::styled(
                 item.get(&column)
