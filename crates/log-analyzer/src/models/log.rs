@@ -1,5 +1,4 @@
 use async_std::sync::RwLock;
-use async_std::channel::Receiver;
 
 use super::format::Format;
 

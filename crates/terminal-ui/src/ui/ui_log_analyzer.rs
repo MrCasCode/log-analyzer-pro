@@ -1,17 +1,18 @@
 use log_analyzer::models::log_line::LogLine;
 use tui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Corner, Direction, Layout, Rect},
+    backend::Backend,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans, Text},
-    widgets::{Block, Borders, Cell, Clear, List, ListItem, ListState, Paragraph, Row, Table},
-    Frame, Terminal,
+    text::{Span, Text},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    Frame,
 };
 
 use crate::{
     app::{Module, INDEX_SEARCH},
+    data::lazy_stateful_table::LazyStatefulTable,
     styles::{SELECTED_COLOR, SELECTED_STYLE},
-    App, data::{stateful_table::StatefulTable, lazy_stateful_table::LazyStatefulTable},
+    App,
 };
 
 use super::ui_shared::display_cursor;
@@ -46,7 +47,7 @@ where
 
         let format = match &item.2 {
             Some(format) => format.as_str(),
-            _ => ""
+            _ => "",
         };
 
         let cells = vec![
@@ -126,7 +127,7 @@ fn draw_log<B>(
     f: &mut Frame<B>,
     is_selected: bool,
     items: &mut LazyStatefulTable<LogLine>,
-    log_columns: &Vec<(String, bool)>,
+    log_columns: &[(String, bool)],
     title: &str,
     horizontal_offset: usize,
     area: Rect,
@@ -157,7 +158,7 @@ fn draw_log<B>(
     let rows = items.items.iter().map(|item| {
         let cells = enabled_columns.iter().map(|(column, _)| {
             Cell::from(Span::styled(
-                item.get(&column)
+                item.get(column)
                     .unwrap()
                     .get(horizontal_offset..)
                     .unwrap_or_default(),
@@ -224,7 +225,7 @@ where
         f,
         app.selected_module == Module::Logs,
         &mut app.log_lines,
-        &mut app.log_columns,
+        &app.log_columns,
         "Log",
         app.horizontal_offset,
         main_modules[0],
@@ -234,7 +235,7 @@ where
         f,
         app.selected_module == Module::SearchResult,
         &mut app.search_lines,
-        &mut app.log_columns,
+        &app.log_columns,
         "Search results",
         app.horizontal_offset,
         main_modules[2],

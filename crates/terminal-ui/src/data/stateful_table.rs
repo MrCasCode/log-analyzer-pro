@@ -1,4 +1,4 @@
-use std::sync::{RwLock, Arc};
+use std::sync::{Arc, RwLock};
 
 use tui::widgets::TableState;
 
@@ -19,7 +19,7 @@ impl<T> StatefulTable<T> {
 }
 
 impl<T> Stateful<T> for StatefulTable<T> {
-    fn next(&mut self) {
+    fn next(&mut self) -> usize {
         if self.items.read().unwrap().len() > 0 {
             let i = match self.state.selected() {
                 Some(i) => {
@@ -33,9 +33,10 @@ impl<T> Stateful<T> for StatefulTable<T> {
             };
             self.state.select(Some(i));
         }
+        self.state.selected().unwrap_or_default()
     }
 
-    fn previous(&mut self) {
+    fn previous(&mut self) -> usize {
         if self.items.read().unwrap().len() > 0 {
             let i = match self.state.selected() {
                 Some(i) => {
@@ -49,6 +50,7 @@ impl<T> Stateful<T> for StatefulTable<T> {
             };
             self.state.select(Some(i));
         }
+        self.state.selected().unwrap_or_default()
     }
 
     fn unselect(&mut self) {

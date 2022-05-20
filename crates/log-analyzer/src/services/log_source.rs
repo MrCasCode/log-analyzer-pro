@@ -1,28 +1,14 @@
-
-
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-
-use async_std::io::prelude::{SeekExt, BufReadExt};
-use async_std::{prelude::*, task, channel};
-use async_std::task::JoinHandle;
-use async_std::{fs::File, io::BufReader, io::Seek, io::SeekFrom, stream::Stream};
-//use tokio::sync::{broadcast::Sender};
 use std::sync::mpsc::SyncSender;
-use futures::{StreamExt};
 
-use crate::models::log::Log;
+use anyhow::{anyhow, Result};
 
-use anyhow::{Result, anyhow};
-
+use async_std::{fs::File, io::{BufReader, prelude::BufReadExt}, prelude::StreamExt};
 use async_trait::async_trait;
-
-
 
 #[derive(PartialEq)]
 pub enum SourceType {
     FILE,
-    WS
+    WS,
 }
 
 impl TryFrom<usize> for SourceType {
@@ -32,7 +18,7 @@ impl TryFrom<usize> for SourceType {
         match value {
             0 => Ok(SourceType::FILE),
             1 => Ok(SourceType::WS),
-            _ => Err(())
+            _ => Err(()),
         }
     }
 }
@@ -49,22 +35,24 @@ impl Into<usize> for SourceType {
 async fn is_file_path_valid(path: &String) -> bool {
     match File::open(&path).await {
         Ok(_) => true,
-        Err(_) => false
+        Err(_) => false,
     }
 }
 
-
-pub async fn create_source(source: SourceType, source_address: String) -> Result<Box<dyn LogSource + Send + Sync>> {
+pub async fn create_source(
+    source: SourceType,
+    source_address: String,
+) -> Result<Box<dyn LogSource + Send + Sync>> {
     match source {
-        SourceType::FILE => {
-            match is_file_path_valid(&source_address).await {
-                true => Ok(Box::new(FileSource{path: source_address})),
-                false => Err(anyhow!("Could not open file.\nPlease that path is correct"))
-            }
+        SourceType::FILE => match is_file_path_valid(&source_address).await {
+            true => Ok(Box::new(FileSource {
+                path: source_address,
+            })),
+            false => Err(anyhow!("Could not open file.\nPlease that path is correct")),
         },
-        SourceType::WS => {
-            Ok(Box::new(WsSource{address: source_address}))
-        }
+        SourceType::WS => Ok(Box::new(WsSource {
+            _address: source_address,
+        })),
     }
 }
 
@@ -72,8 +60,6 @@ pub async fn create_source(source: SourceType, source_address: String) -> Result
 pub trait LogSource {
     async fn run(&self, sender: SyncSender<(String, Vec<String>)>) -> Result<()>;
 }
-
-
 
 pub struct FileSource {
     path: String,
@@ -100,28 +86,22 @@ impl LogSource for FileSource {
                         read_lines += 1;
                     }
                     sender.send((self.path.clone(), v))?;
-                },
-                Err(err) => break,
+                }
+                Err(_) => break,
             }
-        };
+        }
 
         Ok(())
     }
 }
 
-
-
-
-
-
-
 pub struct WsSource {
-    address: String
+    _address: String,
 }
 
 #[async_trait]
 impl LogSource for WsSource {
-    async fn run(&self, sender: SyncSender<(String, Vec<String>)>) -> Result<()> {
+    async fn run(&self, _sender: SyncSender<(String, Vec<String>)>) -> Result<()> {
         unimplemented!()
     }
 }

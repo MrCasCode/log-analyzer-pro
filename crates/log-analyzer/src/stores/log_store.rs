@@ -3,8 +3,6 @@ use std::sync::RwLock;
 use std::{iter::Iterator, ops::Range, sync::Arc};
 
 use crate::services::log_source::LogSource;
-use async_trait::async_trait;
-use futures::join;
 
 pub trait LogStore {
     fn add_log(

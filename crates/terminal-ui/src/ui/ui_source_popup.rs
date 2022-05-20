@@ -6,12 +6,12 @@ use crate::{
     styles::SELECTED_STYLE,
 };
 use tui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Alignment, Constraint, Corner, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    backend::{Backend},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
     text::{Span, Spans},
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs},
-    Frame, Terminal,
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs},
+    Frame,
 };
 
 use super::{ui_popup::centered_rect, ui_shared::display_cursor};

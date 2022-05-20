@@ -4,17 +4,15 @@ use log_analyzer::models::filter::FilterAction;
 use log_analyzer::models::{filter::Filter, log_line::LogLine};
 use log_analyzer::services::log_service::LogAnalyzer;
 
-use std::{
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
 use tui_input::backend::crossterm as input_backend;
 use tui_input::Input;
 
-use crate::data::Stateful;
 use crate::data::lazy_stateful_table::{LazySource, LazyStatefulTable};
 use crate::data::stateful_list::StatefulList;
 use crate::data::stateful_table::StatefulTable;
+use crate::data::Stateful;
 
 /* ------ NEW SOURCE INDEXES ------- */
 pub const INDEX_SOURCE_TYPE: usize = 0;
@@ -62,7 +60,7 @@ pub enum Module {
 }
 
 struct LogSourcer {
-    log_analyzer: Box<Arc<dyn LogAnalyzer>>
+    log_analyzer: Box<Arc<dyn LogAnalyzer>>,
 }
 
 impl LazySource<LogLine> for LogSourcer {
@@ -71,7 +69,7 @@ impl LazySource<LogLine> for LogSourcer {
     }
 }
 struct SearchSourcer {
-    log_analyzer: Box<Arc<dyn LogAnalyzer>>
+    log_analyzer: Box<Arc<dyn LogAnalyzer>>,
 }
 
 impl LazySource<LogLine> for SearchSourcer {
@@ -141,8 +139,12 @@ impl App {
                 .collect(),
         ));
 
-        let log_sourcer = LogSourcer {log_analyzer: log_analyzer.clone()};
-        let search_sourcer = SearchSourcer {log_analyzer: log_analyzer.clone()};
+        let log_sourcer = LogSourcer {
+            log_analyzer: log_analyzer.clone(),
+        };
+        let search_sourcer = SearchSourcer {
+            log_analyzer: log_analyzer.clone(),
+        };
 
         App {
             log_analyzer,
@@ -192,7 +194,7 @@ impl App {
                     .value()
                     .to_string();
 
-                if alias.len() > 0 {
+                if !alias.is_empty() {
                     self.log_analyzer.add_format(&alias, &regex)?;
                     self.update_formats().await;
                     Some(alias)
@@ -270,9 +272,13 @@ impl App {
     async fn handle_sources_input(&mut self, key: KeyEvent) {
         match key.code {
             // Navigate up sources
-            KeyCode::Up => self.sources.previous(),
+            KeyCode::Up => {
+                self.sources.previous();
+            }
             // Navigate down sources
-            KeyCode::Down => self.sources.next(),
+            KeyCode::Down => {
+                self.sources.next();
+            }
             // Toggle enabled/disabled source
             KeyCode::Enter => {}
             // Add new source -> Popup window
@@ -292,9 +298,13 @@ impl App {
     async fn handle_filters_input(&mut self, key: KeyEvent) {
         match key.code {
             // Navigate up filters
-            KeyCode::Up => self.filters.previous(),
+            KeyCode::Up => {
+                self.filters.previous();
+            }
             // Navigate down filters
-            KeyCode::Down => self.filters.next(),
+            KeyCode::Down => {
+                self.filters.next();
+            }
             // Toggle enabled/disabled source
             KeyCode::Enter => {
                 if let Some(index) = self.filters.state.selected() {
@@ -343,8 +353,8 @@ impl App {
                     .add_search(&self.input_buffers[INDEX_SEARCH].value().into());
             }
             _ => {
-                let _ = input_backend::to_input_request(Event::Key(key))
-                    .and_then(|req| Some(self.input_buffers[INDEX_SEARCH].handle(req)));
+                input_backend::to_input_request(Event::Key(key))
+                    .map(|req| self.input_buffers[INDEX_SEARCH].handle(req));
             }
         }
     }
@@ -360,8 +370,7 @@ impl App {
                     .log_analyzer
                     .get_formats()
                     .iter()
-                    .filter(|format| format.alias == alias)
-                    .next()
+                    .find(|format| format.alias == alias)
                     .unwrap()
                     .clone();
                 self.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS] =
@@ -374,7 +383,7 @@ impl App {
         if key.code == KeyCode::Esc {
             self.show_source_popup = false;
             self.selected_module = Module::Sources;
-            return ();
+            return;
         }
 
         match self.input_buffer_index {
@@ -405,8 +414,7 @@ impl App {
             | INDEX_SOURCE_NEW_FORMAT_ALIAS
             | INDEX_SOURCE_NEW_FORMAT_REGEX) => {
                 input_backend::to_input_request(Event::Key(key))
-                    .and_then(|req| Some(self.input_buffers[index].handle(req)));
-                ()
+                    .map(|req| self.input_buffers[index].handle(req));
             }
             INDEX_SOURCE_OK_BUTTON => {
                 if key.code == KeyCode::Enter {
@@ -434,7 +442,7 @@ impl App {
         if key.code == KeyCode::Esc {
             self.show_filter_popup = false;
             self.selected_module = Module::Filters;
-            return ();
+            return;
         }
 
         match self.input_buffer_index {
@@ -449,24 +457,22 @@ impl App {
             | INDEX_FILTER_GREEN_COLOR
             | INDEX_FILTER_BLUE_COLOR) => {
                 input_backend::to_input_request(Event::Key(key))
-                    .and_then(|req| Some(self.input_buffers[index].handle(req)));
-                ()
+                    .map(|req| self.input_buffers[index].handle(req));
             }
             INDEX_FILTER_TYPE => {
                 // Switch tabs
                 if key.code == KeyCode::Right || key.code == KeyCode::Left {
                     let circular_choice = |i: &mut usize, max, add: i32| {
                         *i = match (*i as i32 + add) as i32 {
-                            r if r > max => 0 as usize, // if adding overflows -> set to 0
+                            r if r > max => 0_usize,    // if adding overflows -> set to 0
                             r if r < 0 => max as usize, // if adding underflows -> set to 0
                             r => r as usize,
                         }
                     };
 
                     let sum = if key.code == KeyCode::Right { 1 } else { -1 };
-                    match self.input_buffer_index {
-                        INDEX_FILTER_TYPE => circular_choice(&mut self.filter_type, 2, sum),
-                        _ => {}
+                    if self.input_buffer_index == INDEX_FILTER_TYPE {
+                        circular_choice(&mut self.filter_type, 2, sum)
                     }
                 }
             }
@@ -610,7 +616,7 @@ impl App {
 
 async fn handle_table_input<R, T: Stateful<R>>(
     table: &mut T,
-    log_columns: &mut Vec<(String, bool)>,
+    log_columns: &mut [(String, bool)],
     horizontal_offset: &mut usize,
     key: KeyEvent,
 ) {
@@ -622,14 +628,14 @@ async fn handle_table_input<R, T: Stateful<R>>(
     match key.code {
         // Navigate up log_lines
         KeyCode::Up => {
-            let steps = 1 * multiplier;
+            let steps = multiplier;
             for _ in 0..steps {
                 table.previous();
             }
         }
         // Navigate down log_lines
         KeyCode::Down => {
-            let steps = 1 * multiplier;
+            let steps = multiplier;
             for _ in 0..steps {
                 table.next();
             }

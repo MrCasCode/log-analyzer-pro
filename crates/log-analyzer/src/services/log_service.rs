@@ -1,11 +1,11 @@
 use std::ops::Range;
 use std::sync::{Arc, RwLock};
 
-use anyhow::{anyhow, Result};
-use std::sync::mpsc::{self, SyncSender};
+use anyhow::Result;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use regex::Regex;
+use std::sync::mpsc::{self, SyncSender};
 
 use crate::domain::apply_filters::apply_filters;
 use crate::domain::apply_format::apply_format;
@@ -72,30 +72,32 @@ impl LogService {
         });
 
         let log = log_service.clone();
-        std::thread::spawn(move || {
-            loop {
-                while let Ok((path, lines)) = receiver.recv() {
-                    let (format, indexes, lines) = log.process_raw_lines(path, lines);
-                        lines.into_iter().zip(indexes).map(|(line, index)| (&format, line, index))
-                        .par_bridge()
-                        .map(|(format, line, index)| log.apply_format(format, line, index))
-                        .filter_map(|line| log.apply_filters(line))
-                        .for_each(|line| log.apply_search(line));
-
-                }
+        std::thread::spawn(move || loop {
+            while let Ok((path, lines)) = receiver.recv() {
+                let (format, indexes, lines) = log.process_raw_lines(path, lines);
+                lines
+                    .into_iter()
+                    .zip(indexes)
+                    .map(|(line, index)| (&format, line, index))
+                    .par_bridge()
+                    .map(|(format, line, index)| log.apply_format(format, line, index))
+                    .filter_map(|line| log.apply_filters(line))
+                    .for_each(|line| log.apply_search(line));
             }
         });
 
         log_service
     }
 
-
-    fn process_raw_lines(&self, path: String, lines: Vec<String>) -> (Option<String>, Range<usize>, Vec<String>) {
+    fn process_raw_lines(
+        &self,
+        path: String,
+        lines: Vec<String>,
+    ) -> (Option<String>, Range<usize>, Vec<String>) {
         let indexes = self.log_store.add_lines(&path, &lines);
         let format = self.log_store.get_format(&path);
         (format, indexes, lines)
     }
-
 
     fn apply_format(&self, format: &Option<String>, line: String, index: usize) -> LogLine {
         let mut format_regex = None;
@@ -105,7 +107,7 @@ impl LogService {
             let format = self.processing_store.get_format(format);
             format_regex = match format {
                 Some(format) => r.get(&format),
-                _ => None
+                _ => None,
             };
         }
 
@@ -194,7 +196,8 @@ impl LogAnalyzer for LogService {
     }
 
     fn add_filter(&self, filter: Filter) {
-        self.processing_store.add_filter(filter.alias, filter.filter, filter.action, false);
+        self.processing_store
+            .add_filter(filter.alias, filter.filter, filter.action, false);
     }
 
     fn get_log(&self) -> Arc<RwLock<Vec<LogLine>>> {
@@ -239,7 +242,10 @@ impl LogAnalyzer for LogService {
 
         for log in enabled_logs {
             let lines = self.log_store.extract_lines(&log);
-            self.sender.send((log.clone(), lines));
+            match self.sender.send((log.clone(), lines)) {
+                Ok(_) => {},
+                Err(_) => break,
+            };
         }
     }
 }

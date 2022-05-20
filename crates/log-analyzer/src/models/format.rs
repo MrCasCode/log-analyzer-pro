@@ -19,7 +19,7 @@ impl Format {
 
         let re = Regex::new(&regex);
         match re {
-            Ok(r) => Ok(Format{alias: alias.clone(), regex :  regex.clone()}),
+            Ok(_) => Ok(Format{alias: alias.clone(), regex : regex.clone()}),
             Err(_) => Err(anyhow!("Could not compile regex.\nPlease review regex syntax"))
         }
     }

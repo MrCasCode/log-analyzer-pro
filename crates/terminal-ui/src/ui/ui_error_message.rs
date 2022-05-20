@@ -1,4 +1,4 @@
-use tui::{widgets::{Paragraph, Block, Borders, Clear}, style::Style, layout::{Alignment, Rect, Layout, Direction, Constraint}, backend::Backend, Frame};
+use tui::{widgets::{Paragraph, Block, Borders, Clear}, layout::{Alignment, Rect, Layout, Direction, Constraint}, backend::Backend, Frame};
 
 use crate::{styles::{SELECTED_STYLE, ERROR_STYLE}, app::App};
 
@@ -15,7 +15,7 @@ where
     f.render_widget(ok_button_widget, area);
 }
 
-fn draw_ok_button<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
+fn draw_ok_button<B>(f: &mut Frame<B>, area: Rect)
 where
     B: Backend,
 {
@@ -57,5 +57,5 @@ where
         .split(popup_layout[0]);
 
         draw_error_message(f, app, popup_layout[0]);
-        draw_ok_button(f, app, popup_layout[1]);
+        draw_ok_button(f, popup_layout[1]);
 }

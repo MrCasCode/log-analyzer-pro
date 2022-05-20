@@ -1,5 +1,3 @@
-use std::sync::{Arc, RwLock};
-
 use tui::widgets::TableState;
 
 use super::Stateful;
@@ -21,16 +19,11 @@ impl Area {
     fn current_area(i: usize) -> Area {
         match i {
             i if i < (CAPACITY / 2 - ROOM) => Area::Below,
-            i if (CAPACITY / 2 - ROOM) <= i && i <= (CAPACITY / 2 + ROOM) => Area::Inside,
+            i if ((CAPACITY / 2 - ROOM)..=(CAPACITY / 2 + ROOM)).contains(&i) => Area::Inside,
             i if i > (CAPACITY / 2 + ROOM) => Area::Above,
             _ => Area::Below,
         }
     }
-}
-
-struct HackTableState {
-    offset: usize,
-    selected: Option<usize>,
 }
 
 pub struct LazyStatefulTable<T> {
@@ -53,11 +46,11 @@ impl<T> LazyStatefulTable<T> {
 }
 
 impl<T> Stateful<T> for LazyStatefulTable<T> {
-    fn next(&mut self) {
-        if self.items.len() == 0 {
+    fn next(&mut self) -> usize {
+        if self.items.is_empty() {
             self.items = self.source.source(0, CAPACITY)
         }
-        if self.items.len() > 0 {
+        if !self.items.is_empty() {
             let i = match self.state.selected() {
                 Some(i) => match Area::current_area(i) {
                     Area::Below | Area::Inside => {
@@ -90,13 +83,15 @@ impl<T> Stateful<T> for LazyStatefulTable<T> {
             };
             self.state.select(Some(i));
         }
+
+        self.state.selected().unwrap_or_default()
     }
 
-    fn previous(&mut self) {
-        if self.items.len() == 0 {
+    fn previous(&mut self) -> usize {
+        if self.items.is_empty() {
             self.items = self.source.source(0, CAPACITY)
         }
-        if self.items.len() > 0 {
+        if !self.items.is_empty() {
             let i = match self.state.selected() {
                 Some(i) => match Area::current_area(i) {
                     Area::Above | Area::Inside => {
@@ -126,8 +121,13 @@ impl<T> Stateful<T> for LazyStatefulTable<T> {
 
                         let selected = i + received_elements - if i > 0 { 1 } else { 0 };
 
+                        // Need to manually set private field offset when scrolling up for smooth experience
+                        // Requested to make this public https://github.com/fdehau/tui-rs/issues/626
+                        // but using unsafe in the meantime
                         unsafe {
-                            self.state = std::mem::transmute::<(usize, Option<usize>), TableState>((selected, None))
+                            self.state = std::mem::transmute::<(usize, Option<usize>), TableState>(
+                                (selected, None),
+                            )
                         }
 
                         selected
@@ -138,6 +138,8 @@ impl<T> Stateful<T> for LazyStatefulTable<T> {
             };
             self.state.select(Some(i));
         }
+
+        self.state.selected().unwrap_or_default()
     }
 
     fn unselect(&mut self) {

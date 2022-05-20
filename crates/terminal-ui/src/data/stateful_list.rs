@@ -1,5 +1,6 @@
 use tui::widgets::ListState;
 
+use super::Stateful;
 
 pub struct StatefulList<T> {
     pub state: ListState,
@@ -13,8 +14,9 @@ impl<T> StatefulList<T> {
             items,
         }
     }
-
-    pub fn next(&mut self) -> usize {
+}
+impl<T> Stateful<T> for StatefulList<T> {
+    fn next(&mut self) -> usize {
         let i = match self.state.selected() {
             Some(i) => {
                 if i >= self.items.len() - 1 {
@@ -29,7 +31,7 @@ impl<T> StatefulList<T> {
         i
     }
 
-    pub fn previous(&mut self) -> usize {
+    fn previous(&mut self) -> usize {
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -44,7 +46,7 @@ impl<T> StatefulList<T> {
         i
     }
 
-    pub fn unselect(&mut self) {
+    fn unselect(&mut self) {
         self.state.select(None);
     }
 }

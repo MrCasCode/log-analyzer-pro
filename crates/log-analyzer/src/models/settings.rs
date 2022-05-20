@@ -1,5 +1,4 @@
 use anyhow::{Result, anyhow};
-use regex::Regex;
 use serde::{Serialize, Deserialize};
 
 use super::{format::Format, filter::Filter};

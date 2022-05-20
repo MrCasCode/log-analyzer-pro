@@ -4,34 +4,26 @@ mod ui;
 mod data;
 
 use app::{
-    App, INDEX_SOURCE_FORMAT, INDEX_SOURCE_NEW_FORMAT_ALIAS, INDEX_SOURCE_NEW_FORMAT_REGEX, INDEX_SOURCE_OK_BUTTON, INDEX_SOURCE_PATH,
-    INDEX_SOURCE_TYPE,
+    App,
 };
 use crossterm::{
     event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
-        MouseEvent, MouseEventKind,
+        self, DisableMouseCapture, Event, KeyCode, KeyModifiers, MouseEventKind,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log_analyzer::{stores::{log_store::InMemmoryLogStore, processing_store::{InMemmoryProcessingStore, ProcessingStore}, analysis_store::InMemmoryAnalysisStore}, services::log_service::{LogService, LogAnalyzer}, models::settings::Settings};
+use log_analyzer::{stores::{log_store::InMemmoryLogStore, processing_store::{InMemmoryProcessingStore}, analysis_store::InMemmoryAnalysisStore}, services::log_service::{LogService, LogAnalyzer}, models::settings::Settings};
 
 use std::{
     error::Error,
-    fmt::{Debug, Display, Formatter},
+    fmt::{Debug},
     io,
-    slice::Iter,
     time::{Duration, Instant}, sync::Arc,
     fs
 };
-use styles::SELECTED_STYLE;
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Alignment, Constraint, Corner, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans},
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs},
     Frame, Terminal,
 };
 use ui::{ui_log_analyzer::draw_log_analyzer_view, ui_source_popup::draw_source_popup, ui_filter_popup::draw_filter_popup, ui_error_message::draw_error_popup};
@@ -67,9 +59,9 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
     if let Ok(file) = fs::read_to_string("settings.json") {
         if let Ok(settings) = Settings::from_json(&file) {
             for format in settings.formats {
-                log_service.add_format(&format.alias, &format.regex);
+                log_service.add_format(&format.alias, &format.regex)?;
             }
-            for filter in settings.filters {
+            for _filter in settings.filters {
                 //processing_store.add_filter(filter.alias, filter.filter, filter.action, false);
             }
         }

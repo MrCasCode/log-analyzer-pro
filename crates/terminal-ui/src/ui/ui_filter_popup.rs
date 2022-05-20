@@ -8,15 +8,14 @@ use crate::{
     styles::SELECTED_STYLE,
 };
 use tui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Alignment, Constraint, Corner, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    backend::Backend,
+    layout::{Alignment, Layout, Rect, Constraint, Direction},
+    style::{Color, Style},
     text::{Span, Spans},
     widgets::{
-        Block, BorderType, Borders, Cell, Clear, List, ListItem, ListState, Paragraph, Row, Table,
-        TableState, Tabs,
+        Block, Borders, Clear, Paragraph, Tabs,
     },
-    Frame, Terminal,
+    Frame,
 };
 
 use super::{ui_popup::centered_rect, ui_shared::display_cursor};
@@ -64,7 +63,7 @@ fn draw_filter_type_selector<B>(
     f.render_widget(source_type_widget, area);
 }
 
-fn draw_color_selector<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize, title: &str)
+fn draw_color_selector<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
 {
@@ -107,7 +106,7 @@ where
     f.render_widget(w_color, w.inner(color_layout[3]));
 }
 
-fn draw_separator<B>(f: &mut Frame<B>, app: &App, title: &str, area: Rect, offset: &mut usize)
+fn draw_separator<B>(f: &mut Frame<B>, title: &str, area: Rect, offset: &mut usize)
 where
     B: Backend,
 {
@@ -179,7 +178,7 @@ where
     draw_input_field(
         f,
         app,
-        popup_layout[INDEX_FILTER_NAME - INDEX_FILTER_NAME + offset],
+        popup_layout[0],
         INDEX_FILTER_NAME,
         "Name",
     );
@@ -193,7 +192,6 @@ where
 
     draw_separator(
         f,
-        app,
         "Filter",
         popup_layout[INDEX_FILTER_DATETIME - INDEX_FILTER_NAME + offset],
         &mut offset,
@@ -242,7 +240,6 @@ where
     );
     draw_separator(
         f,
-        app,
         "Color",
         popup_layout[INDEX_FILTER_RED_COLOR - INDEX_FILTER_NAME + offset],
         &mut offset,
@@ -251,8 +248,6 @@ where
         f,
         app,
         popup_layout[INDEX_FILTER_RED_COLOR - INDEX_FILTER_NAME + offset],
-        INDEX_FILTER_RED_COLOR,
-        "Color",
     );
     draw_ok_button(f, app, popup_layout[popup_layout.len() - 1])
 }
