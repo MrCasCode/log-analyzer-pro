@@ -53,6 +53,7 @@ pub enum Module {
     Logs,
     Search,
     SearchResult,
+    BottomBar,
     SourcePopup,
     FilterPopup,
     ErrorPopup,
@@ -89,7 +90,6 @@ pub struct App {
 
     pub selected_module: Module,
 
-    pub show_side_panel: bool,
     pub show_source_popup: bool,
     pub show_filter_popup: bool,
 
@@ -112,7 +112,10 @@ pub struct App {
     pub log_lines: LazyStatefulTable<LogLine>,
     pub search_lines: LazyStatefulTable<LogLine>,
     pub horizontal_offset: usize,
-    pub log_search_size_ratio: i16,
+
+    pub side_main_size_percentage: u16,
+    pub log_filter_size_percentage: u16,
+    pub log_search_size_percentage: u16,
 
     pub log_columns: Vec<(String, bool)>,
 
@@ -150,7 +153,6 @@ impl App {
         App {
             log_analyzer,
             selected_module: Module::Sources,
-            show_side_panel: true,
             show_source_popup: false,
             show_filter_popup: false,
 
@@ -169,7 +171,9 @@ impl App {
             log_lines: LazyStatefulTable::new(Box::new(log_sourcer)),
             search_lines: LazyStatefulTable::new(Box::new(search_sourcer)),
             horizontal_offset: 0,
-            log_search_size_ratio: 30,
+            log_filter_size_percentage: 50,
+            log_search_size_percentage: 75,
+            side_main_size_percentage: 25,
             log_columns: LogLine::columns()
                 .into_iter()
                 .map(|column| (column, true))
@@ -272,6 +276,24 @@ impl App {
     }
 
     async fn handle_sources_input(&mut self, key: KeyEvent) {
+        match key.modifiers {
+            KeyModifiers::SHIFT => match key.code {
+                KeyCode::Char('W') => {
+                    App::decrease_ratio(&mut self.log_filter_size_percentage, 5, 20)
+                }
+                KeyCode::Char('S') => {
+                    App::increase_ratio(&mut self.log_filter_size_percentage, 5, 80)
+                }
+                KeyCode::Char('A') => {
+                    App::decrease_ratio(&mut self.side_main_size_percentage, 5, 0)
+                }
+                KeyCode::Char('D') => {
+                    App::increase_ratio(&mut self.side_main_size_percentage, 5, 50)
+                }
+                _ => {}
+            },
+            _ => {}
+        };
         match key.code {
             // Navigate up sources
             KeyCode::Up => {
@@ -298,6 +320,24 @@ impl App {
     }
 
     async fn handle_filters_input(&mut self, key: KeyEvent) {
+        match key.modifiers {
+            KeyModifiers::SHIFT => match key.code {
+                KeyCode::Char('W') => {
+                    App::decrease_ratio(&mut self.log_filter_size_percentage, 5, 20)
+                }
+                KeyCode::Char('S') => {
+                    App::increase_ratio(&mut self.log_filter_size_percentage, 5, 80)
+                }
+                KeyCode::Char('A') => {
+                    App::decrease_ratio(&mut self.side_main_size_percentage, 5, 0)
+                }
+                KeyCode::Char('D') => {
+                    App::increase_ratio(&mut self.side_main_size_percentage, 5, 50)
+                }
+                _ => {}
+            },
+            _ => {}
+        };
         match key.code {
             // Navigate up filters
             KeyCode::Up => {
@@ -312,7 +352,6 @@ impl App {
                 if let Some(index) = self.filters.state.selected() {
                     let (_, alias) = &self.filters.items.read().unwrap()[index];
                     self.log_analyzer.toggle_filter(alias);
-
                 }
                 self.update_filters().await;
                 self.log_lines.reload();
@@ -332,19 +371,11 @@ impl App {
     }
 
     async fn handle_log_input(&mut self, key: KeyEvent) {
-        self.handle_table_input(
-            Module::Logs,
-            key,
-        )
-        .await;
+        self.handle_table_input(Module::Logs, key).await;
     }
 
     async fn handle_search_result_input(&mut self, key: KeyEvent) {
-        self.handle_table_input(
-            Module::SearchResult,
-            key,
-        )
-        .await;
+        self.handle_table_input(Module::SearchResult, key).await;
     }
 
     async fn handle_search_input(&mut self, key: KeyEvent) {
@@ -549,7 +580,7 @@ impl App {
                 KeyCode::Up => self.selected_module = Module::SearchResult,
                 KeyCode::Down => self.selected_module = Module::Search,
                 KeyCode::Left | KeyCode::Right => {
-                    if self.show_side_panel {
+                    if self.side_main_size_percentage > 0 {
                         self.selected_module = Module::Sources
                     }
                 }
@@ -559,7 +590,7 @@ impl App {
                 KeyCode::Up => self.selected_module = Module::Logs,
                 KeyCode::Down => self.selected_module = Module::SearchResult,
                 KeyCode::Left | KeyCode::Right => {
-                    if self.show_side_panel {
+                    if self.side_main_size_percentage > 0 {
                         self.selected_module = Module::Filters
                     }
                 }
@@ -569,7 +600,7 @@ impl App {
                 KeyCode::Up => self.selected_module = Module::Search,
                 KeyCode::Down => self.selected_module = Module::Logs,
                 KeyCode::Left | KeyCode::Right => {
-                    if self.show_side_panel {
+                    if self.side_main_size_percentage > 0 {
                         self.selected_module = Module::Filters
                     }
                 }
@@ -610,24 +641,25 @@ impl App {
                 }
             }
             Module::ErrorPopup => (),
+            Module::BottomBar => (),
             Module::None => self.selected_module = Module::Logs,
         }
     }
 
-    fn increase_log_search_ratio(&mut self) {
-        self.log_search_size_ratio = (self.log_search_size_ratio + 5).min(40)
+    fn increase_ratio(ratio: &mut u16, step: u16, max: u16) {
+        *ratio = (*ratio + step).min(max)
     }
 
-    fn decrease_log_search_ratio(&mut self) {
-        self.log_search_size_ratio = (self.log_search_size_ratio - 5).max(-40)
+    fn decrease_ratio(ratio: &mut u16, step: u16, min: u16) {
+        *ratio = if *ratio > min { *ratio - step } else { *ratio }
     }
 
-    async fn handle_table_input(
-        &mut self,
-        module: Module,
-        key: KeyEvent,
-    ) {
-        let table = if module == Module::Logs {&mut self.log_lines} else {&mut self.search_lines};
+    async fn handle_table_input(&mut self, module: Module, key: KeyEvent) {
+        let table = if module == Module::Logs {
+            &mut self.log_lines
+        } else {
+            &mut self.search_lines
+        };
         let multiplier = if key.modifiers == KeyModifiers::ALT {
             10
         } else {
@@ -635,11 +667,21 @@ impl App {
         };
         match key.modifiers {
             KeyModifiers::SHIFT => match key.code {
-            KeyCode::Char('W') => self.decrease_log_search_ratio(),
-            KeyCode::Char('S') => self.increase_log_search_ratio(),
-            KeyCode::Char('G') => {},
-            _ => {},
-            }
+                KeyCode::Char('W') => {
+                    App::decrease_ratio(&mut self.log_search_size_percentage, 5, 10)
+                }
+                KeyCode::Char('S') => {
+                    App::increase_ratio(&mut self.log_search_size_percentage, 5, 90)
+                }
+                KeyCode::Char('A') => {
+                    App::decrease_ratio(&mut self.side_main_size_percentage, 5, 0)
+                }
+                KeyCode::Char('D') => {
+                    App::increase_ratio(&mut self.side_main_size_percentage, 5, 50)
+                }
+                KeyCode::Char('G') => {}
+                _ => {}
+            },
             _ => match key.code {
                 // Navigate up log_lines
                 KeyCode::Up => {
@@ -670,21 +712,36 @@ impl App {
                     }
                 }
                 // Navigate up log_lines
-                KeyCode::Left => self.horizontal_offset -= if self.horizontal_offset == 0 { 0 } else { 10 },
+                KeyCode::Left => {
+                    self.horizontal_offset -= if self.horizontal_offset == 0 { 0 } else { 10 }
+                }
                 // Navigate down log_lines
                 KeyCode::Right => self.horizontal_offset += 10,
-                KeyCode::Char('I') | KeyCode::Char('i') => self.log_columns[0].1 = !self.log_columns[0].1,
-                KeyCode::Char('D') | KeyCode::Char('d') => self.log_columns[1].1 = !self.log_columns[1].1,
-                KeyCode::Char('T') | KeyCode::Char('t') => self.log_columns[2].1 = !self.log_columns[2].1,
-                KeyCode::Char('A') | KeyCode::Char('a') => self.log_columns[3].1 = !self.log_columns[3].1,
-                KeyCode::Char('S') | KeyCode::Char('s') => self.log_columns[4].1 = !self.log_columns[4].1,
-                KeyCode::Char('F') | KeyCode::Char('f') => self.log_columns[5].1 = !self.log_columns[5].1,
-                KeyCode::Char('P') | KeyCode::Char('p') => self.log_columns[6].1 = !self.log_columns[6].1,
+                KeyCode::Char('I') | KeyCode::Char('i') => {
+                    self.log_columns[0].1 = !self.log_columns[0].1
+                }
+                KeyCode::Char('D') | KeyCode::Char('d') => {
+                    self.log_columns[1].1 = !self.log_columns[1].1
+                }
+                KeyCode::Char('T') | KeyCode::Char('t') => {
+                    self.log_columns[2].1 = !self.log_columns[2].1
+                }
+                KeyCode::Char('A') | KeyCode::Char('a') => {
+                    self.log_columns[3].1 = !self.log_columns[3].1
+                }
+                KeyCode::Char('S') | KeyCode::Char('s') => {
+                    self.log_columns[4].1 = !self.log_columns[4].1
+                }
+                KeyCode::Char('F') | KeyCode::Char('f') => {
+                    self.log_columns[5].1 = !self.log_columns[5].1
+                }
+                KeyCode::Char('P') | KeyCode::Char('p') => {
+                    self.log_columns[6].1 = !self.log_columns[6].1
+                }
                 // Nothing
                 _ => {}
-            }
+            },
         }
-
     }
 }
 

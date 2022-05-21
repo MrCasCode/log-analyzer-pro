@@ -123,7 +123,6 @@ async fn run_app<B: Backend>(
                         // Quit
                         KeyModifiers::CONTROL => match key.code {
                             KeyCode::Char('c') => return Ok(()),
-                            KeyCode::Char('s') => app.show_side_panel = !app.show_side_panel,
                             _ => async_std::task::block_on(app.handle_input(key)),
                         },
                         // Navigate

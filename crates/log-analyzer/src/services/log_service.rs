@@ -44,6 +44,9 @@ pub trait LogAnalyzer {
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)>;
     fn get_formats(&self) -> Vec<Format>;
     fn get_filters(&self) -> Vec<(bool, Filter)>;
+    fn get_total_raw_lines(&self) -> usize;
+    fn get_total_filtered_lines(&self) -> usize;
+    fn get_total_searched_lines(&self) -> usize;
     fn toggle_filter(&self, id: &String);
 }
 
@@ -247,5 +250,17 @@ impl LogAnalyzer for LogService {
                 Err(_) => break,
             };
         }
+    }
+
+    fn get_total_raw_lines(&self) -> usize {
+        self.log_store.get_total_lines()
+    }
+
+    fn get_total_filtered_lines(&self) -> usize {
+        self.analysis_store.get_total_filtered_lines()
+    }
+
+    fn get_total_searched_lines(&self) -> usize {
+        self.analysis_store.get_total_searched_lines()
     }
 }

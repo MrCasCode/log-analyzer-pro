@@ -14,6 +14,8 @@ pub trait AnalysisStore {
     fn fetch_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
     fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
+    fn get_total_filtered_lines(&self) -> usize;
+    fn get_total_searched_lines(&self) -> usize;
 }
 pub struct InMemmoryAnalysisStore {
     log: Arc<RwLock<Vec<LogLine>>>,
@@ -86,5 +88,13 @@ impl AnalysisStore for InMemmoryAnalysisStore {
     fn reset_search(&self) {
         let mut w = self.search_log.write().unwrap();
         w.clear();
+    }
+
+    fn get_total_filtered_lines(&self) -> usize {
+        self.log.read().unwrap().len()
+    }
+
+    fn get_total_searched_lines(&self) -> usize {
+        self.search_log.read().unwrap().len()
     }
 }

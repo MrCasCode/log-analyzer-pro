@@ -1,10 +1,10 @@
 use log_analyzer::models::log_line::LogLine;
 use tui::{
     backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Text},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
     Frame,
 };
 
@@ -116,7 +116,7 @@ where
 {
     let left_modules = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .constraints([Constraint::Percentage(app.log_filter_size_percentage), Constraint::Percentage(100 - app.log_filter_size_percentage)].as_ref())
         .split(area);
 
     draw_sources(f, app, left_modules[0]);
@@ -205,17 +205,62 @@ where
     }
 }
 
+fn draw_bottom_bar<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize)
+where
+    B: Backend,
+{
+    let bottom_bar_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(33),
+            Constraint::Percentage(33),
+            Constraint::Percentage(33),
+        ])
+        .split(area);
+
+    let auto_scroll = Paragraph::new("AUTO SCROLL")
+        .style(Style::default().add_modifier(Modifier::DIM))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL));
+
+    f.render_widget(auto_scroll, bottom_bar_layout[0]);
+
+    let total = app.log_analyzer.get_total_raw_lines();
+    let filtered = app.log_analyzer.get_total_filtered_lines();
+    let label = format!(" {}/{}", filtered, total);
+    let gauge = Gauge::default()
+        .block(Block::default().borders(Borders::ALL))
+        .gauge_style(Style::default().fg(SELECTED_COLOR))
+        .percent((if total > 0 { filtered * 100 / total } else { 0 }) as u16)
+        .label(label);
+    f.render_widget(gauge, bottom_bar_layout[1]);
+
+    let searched = app.log_analyzer.get_total_searched_lines();
+    let label = format!(" {}/{}", searched, total);
+    let gauge = Gauge::default()
+        .block(Block::default().borders(Borders::ALL))
+        .gauge_style(Style::default().fg(SELECTED_COLOR))
+        .percent((if total > 0 { searched * 100 / total } else { 0 }) as u16)
+        .label(label);
+
+    f.render_widget(gauge, bottom_bar_layout[2]);
+}
+
 fn draw_main_panel<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
 {
+    let expandable = area.height - 3;
+    let log_lenght = expandable * (app.log_search_size_percentage) as u16 / 100;
+    let search_lenght = expandable * (100 - app.log_search_size_percentage) as u16 / 100;
+
     let main_modules = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage((45 + app.log_search_size_ratio) as u16),
-                Constraint::Max(3),
-                Constraint::Percentage((45 - app.log_search_size_ratio) as u16),
+                Constraint::Length(log_lenght),
+                Constraint::Length(3),
+                Constraint::Length(search_lenght),
             ]
             .as_ref(),
         )
@@ -246,17 +291,24 @@ pub fn draw_log_analyzer_view<B>(f: &mut Frame<B>, app: &mut App)
 where
     B: Backend,
 {
-    let constraints = if app.show_side_panel {
-        [Constraint::Percentage(25), Constraint::Percentage(75)].as_ref()
-    } else {
-        [Constraint::Percentage(0), Constraint::Percentage(100)].as_ref()
-    };
+    let ui = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Length(f.size().height - 3),
+                Constraint::Length(3),
+            ]
+            .as_ref(),
+        )
+        .split(f.size());
+
     // Create two chunks with equal horizontal screen space
     let panels = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(constraints)
-        .split(f.size());
+        .constraints([Constraint::Percentage(app.side_main_size_percentage), Constraint::Percentage(100 - app.side_main_size_percentage)])
+        .split(ui[0]);
 
     draw_sidebar(f, app, panels[0]);
-    draw_main_panel(f, app, panels[1])
+    draw_main_panel(f, app, panels[1]);
+    draw_bottom_bar(f, app, ui[1], INDEX_SEARCH);
 }

@@ -18,6 +18,7 @@ pub trait LogStore {
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)>;
     fn get_lines(&self, log_id: &String) -> Vec<String>;
     fn extract_lines(&self, log_id: &String) -> Vec<String>;
+    fn get_total_lines(&self) -> usize;
 }
 
 pub struct InMemmoryLogStore {
@@ -128,5 +129,9 @@ impl LogStore for InMemmoryLogStore {
             Some(alias) => Some(alias.clone()),
             _ => None,
         }
+    }
+
+    fn get_total_lines(&self) -> usize {
+        self.raw_lines.read().unwrap().values().fold(0, |acc, v| acc + v.len())
     }
 }
