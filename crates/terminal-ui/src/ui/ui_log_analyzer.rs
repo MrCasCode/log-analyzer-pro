@@ -213,9 +213,9 @@ where
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Percentage(75),
+                Constraint::Percentage((45 + app.log_search_size_ratio) as u16),
                 Constraint::Max(3),
-                Constraint::Percentage(15),
+                Constraint::Percentage((45 - app.log_search_size_ratio) as u16),
             ]
             .as_ref(),
         )

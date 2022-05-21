@@ -112,6 +112,7 @@ pub struct App {
     pub log_lines: LazyStatefulTable<LogLine>,
     pub search_lines: LazyStatefulTable<LogLine>,
     pub horizontal_offset: usize,
+    pub log_search_size_ratio: i16,
 
     pub log_columns: Vec<(String, bool)>,
 
@@ -168,6 +169,7 @@ impl App {
             log_lines: LazyStatefulTable::new(Box::new(log_sourcer)),
             search_lines: LazyStatefulTable::new(Box::new(search_sourcer)),
             horizontal_offset: 0,
+            log_search_size_ratio: 30,
             log_columns: LogLine::columns()
                 .into_iter()
                 .map(|column| (column, true))
@@ -330,20 +332,16 @@ impl App {
     }
 
     async fn handle_log_input(&mut self, key: KeyEvent) {
-        handle_table_input(
-            &mut self.log_lines,
-            &mut self.log_columns,
-            &mut self.horizontal_offset,
+        self.handle_table_input(
+            Module::Logs,
             key,
         )
         .await;
     }
 
     async fn handle_search_result_input(&mut self, key: KeyEvent) {
-        handle_table_input(
-            &mut self.search_lines,
-            &mut self.log_columns,
-            &mut self.horizontal_offset,
+        self.handle_table_input(
+            Module::SearchResult,
             key,
         )
         .await;
@@ -615,62 +613,78 @@ impl App {
             Module::None => self.selected_module = Module::Logs,
         }
     }
-}
 
-async fn handle_table_input<R, T: Stateful<R>>(
-    table: &mut T,
-    log_columns: &mut [(String, bool)],
-    horizontal_offset: &mut usize,
-    key: KeyEvent,
-) {
-    let multiplier = if key.modifiers == KeyModifiers::ALT {
-        10
-    } else {
-        1
-    };
-    match key.code {
-        // Navigate up log_lines
-        KeyCode::Up => {
-            let steps = multiplier;
-            for _ in 0..steps {
-                table.previous();
-            }
-        }
-        // Navigate down log_lines
-        KeyCode::Down => {
-            let steps = multiplier;
-            for _ in 0..steps {
-                table.next();
-            }
-        }
-        // Navigate up log_lines
-        KeyCode::PageUp => {
-            let steps = 100 * multiplier;
-            for _ in 0..steps {
-                table.previous();
-            }
-        }
-        // Navigate down log_lines
-        KeyCode::PageDown => {
-            let steps = 100 * multiplier;
-            for _ in 0..steps {
-                table.next();
-            }
-        }
-        // Navigate up log_lines
-        KeyCode::Left => *horizontal_offset -= if *horizontal_offset == 0 { 0 } else { 10 },
-        // Navigate down log_lines
-        KeyCode::Right => *horizontal_offset += 10,
-        KeyCode::Char('I') | KeyCode::Char('i') => log_columns[0].1 = !log_columns[0].1,
-        KeyCode::Char('D') | KeyCode::Char('d') => log_columns[1].1 = !log_columns[1].1,
-        KeyCode::Char('T') | KeyCode::Char('t') => log_columns[2].1 = !log_columns[2].1,
-        KeyCode::Char('A') | KeyCode::Char('a') => log_columns[3].1 = !log_columns[3].1,
-        KeyCode::Char('S') | KeyCode::Char('s') => log_columns[4].1 = !log_columns[4].1,
-        KeyCode::Char('F') | KeyCode::Char('f') => log_columns[5].1 = !log_columns[5].1,
-        KeyCode::Char('P') | KeyCode::Char('p') => log_columns[6].1 = !log_columns[6].1,
+    fn increase_log_search_ratio(&mut self) {
+        self.log_search_size_ratio = (self.log_search_size_ratio + 5).min(40)
+    }
 
-        // Nothing
-        _ => {}
+    fn decrease_log_search_ratio(&mut self) {
+        self.log_search_size_ratio = (self.log_search_size_ratio - 5).max(-40)
+    }
+
+    async fn handle_table_input(
+        &mut self,
+        module: Module,
+        key: KeyEvent,
+    ) {
+        let table = if module == Module::Logs {&mut self.log_lines} else {&mut self.search_lines};
+        let multiplier = if key.modifiers == KeyModifiers::ALT {
+            10
+        } else {
+            1
+        };
+        match key.modifiers {
+            KeyModifiers::SHIFT => match key.code {
+            KeyCode::Char('W') => self.decrease_log_search_ratio(),
+            KeyCode::Char('S') => self.increase_log_search_ratio(),
+            KeyCode::Char('G') => {},
+            _ => {},
+            }
+            _ => match key.code {
+                // Navigate up log_lines
+                KeyCode::Up => {
+                    let steps = multiplier;
+                    for _ in 0..steps {
+                        table.previous();
+                    }
+                }
+                // Navigate down log_lines
+                KeyCode::Down => {
+                    let steps = multiplier;
+                    for _ in 0..steps {
+                        table.next();
+                    }
+                }
+                // Navigate up log_lines
+                KeyCode::PageUp => {
+                    let steps = 100 * multiplier;
+                    for _ in 0..steps {
+                        table.previous();
+                    }
+                }
+                // Navigate down log_lines
+                KeyCode::PageDown => {
+                    let steps = 100 * multiplier;
+                    for _ in 0..steps {
+                        table.next();
+                    }
+                }
+                // Navigate up log_lines
+                KeyCode::Left => self.horizontal_offset -= if self.horizontal_offset == 0 { 0 } else { 10 },
+                // Navigate down log_lines
+                KeyCode::Right => self.horizontal_offset += 10,
+                KeyCode::Char('I') | KeyCode::Char('i') => self.log_columns[0].1 = !self.log_columns[0].1,
+                KeyCode::Char('D') | KeyCode::Char('d') => self.log_columns[1].1 = !self.log_columns[1].1,
+                KeyCode::Char('T') | KeyCode::Char('t') => self.log_columns[2].1 = !self.log_columns[2].1,
+                KeyCode::Char('A') | KeyCode::Char('a') => self.log_columns[3].1 = !self.log_columns[3].1,
+                KeyCode::Char('S') | KeyCode::Char('s') => self.log_columns[4].1 = !self.log_columns[4].1,
+                KeyCode::Char('F') | KeyCode::Char('f') => self.log_columns[5].1 = !self.log_columns[5].1,
+                KeyCode::Char('P') | KeyCode::Char('p') => self.log_columns[6].1 = !self.log_columns[6].1,
+                // Nothing
+                _ => {}
+            }
+        }
+
     }
 }
 
