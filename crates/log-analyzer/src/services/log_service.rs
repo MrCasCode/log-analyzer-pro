@@ -37,10 +37,10 @@ pub trait LogAnalyzer {
     fn add_format(&self, alias: &String, regex: &String) -> Result<()>;
     fn add_search(&self, regex: &String);
     fn add_filter(&self, filter: Filter);
-    fn get_log(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
-    fn get_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
+    fn get_log_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize);
+    fn get_search_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize);
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)>;
     fn get_formats(&self) -> Vec<Format>;
     fn get_filters(&self) -> Vec<(bool, Filter)>;
@@ -184,7 +184,7 @@ impl LogAnalyzer for LogService {
                 self.analysis_store.reset_search();
 
                 let r = self.analysis_store.fetch_log();
-                let log = r.read().unwrap();
+                let log = r.read();
 
                 if let Some(re) = self.regex_cache.write().unwrap().put(&regex) {
                     log.par_iter().for_each(|log_line| {
@@ -203,20 +203,20 @@ impl LogAnalyzer for LogService {
             .add_filter(filter.alias, filter.filter, filter.action, false);
     }
 
-    fn get_log(&self) -> Arc<RwLock<Vec<LogLine>>> {
-        self.analysis_store.fetch_log()
-    }
-
     fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine> {
         self.analysis_store.get_log_lines(from, to)
     }
 
-    fn get_search(&self) -> Arc<RwLock<Vec<LogLine>>> {
-        self.analysis_store.fetch_search()
-    }
-
     fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine> {
         self.analysis_store.get_search_lines(from, to)
+    }
+
+    fn get_log_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize) {
+        self.analysis_store.get_log_lines_containing(line, elements)
+    }
+
+    fn get_search_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize) {
+        self.analysis_store.get_search_lines_containing(line, elements)
     }
 
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)> {

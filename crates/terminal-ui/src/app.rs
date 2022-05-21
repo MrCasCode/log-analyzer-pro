@@ -53,7 +53,6 @@ pub enum Module {
     Logs,
     Search,
     SearchResult,
-    BottomBar,
     SourcePopup,
     FilterPopup,
     ErrorPopup,
@@ -641,7 +640,6 @@ impl App {
                 }
             }
             Module::ErrorPopup => (),
-            Module::BottomBar => (),
             Module::None => self.selected_module = Module::Logs,
         }
     }
@@ -737,6 +735,12 @@ impl App {
                 }
                 KeyCode::Char('P') | KeyCode::Char('p') => {
                     self.log_columns[6].1 = !self.log_columns[6].1
+                }
+                KeyCode::Enter => {
+                    if module == Module::SearchResult {
+                        let current_line = &self.search_lines.items[self.search_lines.state.selected().unwrap()];
+                        let index = current_line.index.clone();
+                    }
                 }
                 // Nothing
                 _ => {}

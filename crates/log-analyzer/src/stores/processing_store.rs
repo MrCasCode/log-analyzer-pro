@@ -3,7 +3,7 @@ use crate::models::{
     format::Format,
     log_line::LogLine,
 };
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use rustc_hash::FxHashMap as HashMap;
 
@@ -33,12 +33,12 @@ impl InMemmoryProcessingStore {
 
 impl ProcessingStore for InMemmoryProcessingStore {
     fn add_format(&self, id: String, format: String) {
-        let mut w = self.formats.write().unwrap();
+        let mut w = self.formats.write();
         w.insert(id, format);
     }
 
     fn get_format(&self, id: &String) -> Option<String> {
-        let r = self.formats.read().unwrap();
+        let r = self.formats.read();
         match r.get(id) {
             Some(format) => Some(format.clone()),
             _ => None,
@@ -46,7 +46,7 @@ impl ProcessingStore for InMemmoryProcessingStore {
     }
 
     fn get_formats(&self) -> Vec<Format> {
-        let formats_lock = self.formats.read().unwrap();
+        let formats_lock = self.formats.read();
         formats_lock
             .iter()
             .map(|(alias, regex)| Format {
@@ -57,12 +57,12 @@ impl ProcessingStore for InMemmoryProcessingStore {
     }
 
     fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool) {
-        let mut w = self.filters.write().unwrap();
+        let mut w = self.filters.write();
         w.insert(id, (action, filter, enabled));
     }
 
     fn get_filters(&self) -> Vec<(bool, Filter)> {
-        let r = self.filters.read().unwrap();
+        let r = self.filters.read();
 
         let filters = r
             .iter()
@@ -77,7 +77,7 @@ impl ProcessingStore for InMemmoryProcessingStore {
     }
 
     fn toggle_filter(&self, id: &String) {
-        let mut w = self.filters.write().unwrap();
+        let mut w = self.filters.write();
         if let Some((_, _, enabled)) = w.get_mut(id) {
             *enabled = !*enabled
         }

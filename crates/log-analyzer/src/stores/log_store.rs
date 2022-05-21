@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap as HashMap;
-use std::sync::RwLock;
+use parking_lot::RwLock;
 use std::{iter::Iterator, ops::Range, sync::Arc};
 
 use crate::services::log_source::LogSource;
@@ -52,9 +52,9 @@ impl LogStore for InMemmoryLogStore {
         enabled: bool,
     ) {
         let (mut source_lock, mut format_lock, mut enabled_lock) = (
-            self.source.write().unwrap(),
-            self.format.write().unwrap(),
-            self.enabled.write().unwrap(),
+            self.source.write(),
+            self.format.write(),
+            self.enabled.write(),
         );
 
         source_lock.insert(log_id.clone(), log_source);
@@ -66,7 +66,7 @@ impl LogStore for InMemmoryLogStore {
     }
 
     fn add_line(&self, log_id: &String, line: &String) {
-        let mut raw_lines_lock = self.raw_lines.write().unwrap();
+        let mut raw_lines_lock = self.raw_lines.write();
 
         if !raw_lines_lock.contains_key(log_id) {
             raw_lines_lock.insert(log_id.clone(), Vec::new());
@@ -76,7 +76,7 @@ impl LogStore for InMemmoryLogStore {
     }
 
     fn add_lines(&self, log_id: &String, lines: &Vec<String>) -> Range<usize> {
-        let mut raw_lines_lock = self.raw_lines.write().unwrap();
+        let mut raw_lines_lock = self.raw_lines.write();
 
         if !raw_lines_lock.contains_key(log_id) {
             raw_lines_lock.insert(log_id.clone(), Vec::new());
@@ -90,14 +90,14 @@ impl LogStore for InMemmoryLogStore {
     }
 
     fn get_lines(&self, log_id: &String) -> Vec<String> {
-        match self.raw_lines.read().unwrap().get(log_id) {
+        match self.raw_lines.read().get(log_id) {
             Some(lines) => lines.clone(),
             _ => Vec::new(),
         }
     }
 
     fn extract_lines(&self, log_id: &String) -> Vec<String> {
-        let mut w = self.raw_lines.write().unwrap();
+        let mut w = self.raw_lines.write();
         let lines = std::mem::take(w.get_mut(log_id).unwrap());
 
         lines
@@ -105,7 +105,7 @@ impl LogStore for InMemmoryLogStore {
 
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)> {
         let (format_lock, enabled_lock) =
-            (self.format.read().unwrap(), self.enabled.read().unwrap());
+            (self.format.read(), self.enabled.read());
 
         let logs: Vec<(bool, String, Option<String>)> = enabled_lock
             .iter()
@@ -124,7 +124,7 @@ impl LogStore for InMemmoryLogStore {
     }
 
     fn get_format(&self, log_id: &String) -> Option<String> {
-        let format_lock = self.format.read().unwrap();
+        let format_lock = self.format.read();
         match format_lock.get(log_id) {
             Some(alias) => Some(alias.clone()),
             _ => None,
@@ -132,6 +132,6 @@ impl LogStore for InMemmoryLogStore {
     }
 
     fn get_total_lines(&self) -> usize {
-        self.raw_lines.read().unwrap().values().fold(0, |acc, v| acc + v.len())
+        self.raw_lines.read().values().fold(0, |acc, v| acc + v.len())
     }
 }

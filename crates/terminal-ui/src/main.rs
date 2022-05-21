@@ -72,7 +72,7 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
 
 
     // create app and run it
-    let tick_rate = Duration::from_millis(250);
+    let tick_rate = Duration::from_millis(100);
     let app = App::new(Box::new(log_service)).await;
     let res = run_app(&mut terminal, app, tick_rate).await;
 

@@ -595,6 +595,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
+ "parking_lot 0.12.0",
  "rayon",
  "regex",
  "rustc-hash",
