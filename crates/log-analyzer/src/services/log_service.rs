@@ -1,7 +1,8 @@
 use std::ops::Range;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use anyhow::Result;
+use parking_lot::RwLock;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use regex::Regex;
@@ -64,7 +65,7 @@ impl LogService {
         processing_store: Arc<dyn ProcessingStore + Sync + Send>,
         analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
     ) -> Arc<Self> {
-        let (sender, receiver) = mpsc::sync_channel(2_usize.pow(26));
+        let (sender, receiver) = mpsc::sync_channel(1_000_000_usize);
 
         let log_service = Arc::new(Self {
             log_store,
@@ -76,16 +77,22 @@ impl LogService {
 
         let log = log_service.clone();
         std::thread::spawn(move || loop {
+            let num_cpus = num_cpus::get();
             while let Ok((path, lines)) = receiver.recv() {
                 let (format, indexes, lines) = log.process_raw_lines(path, lines);
-                lines
+                let chunk_size = lines.len() / num_cpus;
+
+                let elements: Vec<(String, usize)> = lines
                     .into_iter()
                     .zip(indexes)
-                    .map(|(line, index)| (&format, line, index))
-                    .par_bridge()
-                    .map(|(format, line, index)| log.apply_format(format, line, index))
-                    .filter_map(|line| log.apply_filters(line))
-                    .for_each(|line| log.apply_search(line));
+                    .map(|(line, index)| (line, index))
+                    .collect();
+
+                elements
+                    .par_chunks(chunk_size.max(num_cpus))
+                    .map(|chunk| log.apply_format(&format, chunk))
+                    .map(|lines| log.apply_filters(lines))
+                    .for_each(|lines| log.apply_search(lines));
             }
         });
 
@@ -102,10 +109,14 @@ impl LogService {
         (format, indexes, lines)
     }
 
-    fn apply_format(&self, format: &Option<String>, line: String, index: usize) -> LogLine {
+    fn apply_format(
+        &self,
+        format: &Option<String>,
+        line_index: &[(String, usize)],
+    ) -> Vec<LogLine> {
         let mut format_regex = None;
 
-        let r = self.regex_cache.read().unwrap();
+        let r = self.regex_cache.read();
         if let Some(format) = format {
             let format = self.processing_store.get_format(format);
             format_regex = match format {
@@ -114,10 +125,15 @@ impl LogService {
             };
         }
 
-        apply_format(&format_regex, &line, index)
+        let mut log_lines: Vec<LogLine> = Vec::with_capacity(line_index.len());
+        for (line, index) in line_index {
+            let log_line = apply_format(&format_regex, &line, *index);
+            log_lines.push(log_line);
+        }
+        log_lines
     }
 
-    fn apply_filters(&self, log_line: LogLine) -> Option<LogLine> {
+    fn apply_filters(&self, lines: Vec<LogLine>) -> Vec<LogLine> {
         let filters: Vec<Filter> = self
             .processing_store
             .get_filters()
@@ -126,17 +142,29 @@ impl LogService {
             .map(|(_, filter)| filter)
             .collect();
 
-        let filtered_line = apply_filters(&filters, log_line)?;
-        self.analysis_store.add_lines(&[&filtered_line]);
-        Some(filtered_line)
+        let mut filtered_lines: Vec<LogLine> = Vec::with_capacity(lines.len());
+
+        for line in lines {
+            if let Some(filtered_line) = apply_filters(&filters, line) {
+                filtered_lines.push(filtered_line);
+            }
+        }
+        self.analysis_store.add_lines(&filtered_lines);
+        filtered_lines
     }
 
-    fn apply_search(&self, log_line: LogLine) {
+    fn apply_search(&self, lines: Vec<LogLine>) {
         if let Some(search_query) = self.analysis_store.get_search_query() {
-            let r = self.regex_cache.read().unwrap();
+            let r = self.regex_cache.read();
             let search_regex = r.get(&search_query);
-            if search_regex.is_some() && apply_search(&search_regex.unwrap(), &log_line) {
-                self.analysis_store.add_search_lines(&[&log_line]);
+            if search_regex.is_some() {
+                let mut search_lines: Vec<LogLine> = Vec::with_capacity(lines.len());
+                for line in lines {
+                    if apply_search(&search_regex.unwrap(), &line) {
+                        search_lines.push(line);
+                    }
+                }
+                self.analysis_store.add_search_lines(&search_lines);
             }
         }
     }
@@ -170,7 +198,7 @@ impl LogAnalyzer for LogService {
     fn add_format(&self, alias: &String, regex: &String) -> Result<()> {
         let format = Format::new(alias, regex)?;
 
-        self.regex_cache.write().unwrap().put(&regex);
+        self.regex_cache.write().put(&regex);
 
         self.processing_store.add_format(format.alias, format.regex);
         Ok(())
@@ -186,12 +214,12 @@ impl LogAnalyzer for LogService {
                 let r = self.analysis_store.fetch_log();
                 let log = r.read();
 
-                if let Some(re) = self.regex_cache.write().unwrap().put(&regex) {
-                    log.par_iter().for_each(|log_line| {
-                        if apply_search(&re, &log_line) {
-                            self.analysis_store.add_search_lines(&[&log_line]);
-                        }
-                    });
+                if let Some(re) = self.regex_cache.write().put(&regex) {
+                    let search_lines: Vec<LogLine> = log.par_iter().filter(|log_line| {
+                        apply_search(&re, &log_line)
+                    }).map(|l| l.clone()).collect();
+
+                    self.analysis_store.add_search_lines(&search_lines);
                 }
             }
             Err(_) => {}
@@ -216,7 +244,8 @@ impl LogAnalyzer for LogService {
     }
 
     fn get_search_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize) {
-        self.analysis_store.get_search_lines_containing(line, elements)
+        self.analysis_store
+            .get_search_lines_containing(line, elements)
     }
 
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)> {
@@ -246,7 +275,7 @@ impl LogAnalyzer for LogService {
         for log in enabled_logs {
             let lines = self.log_store.extract_lines(&log);
             match self.sender.send((log.clone(), lines)) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(_) => break,
             };
         }

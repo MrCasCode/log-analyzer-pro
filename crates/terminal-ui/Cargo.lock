@@ -595,6 +595,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
+ "num_cpus",
  "parking_lot 0.12.0",
  "rayon",
  "regex",

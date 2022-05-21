@@ -1,4 +1,4 @@
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::{SyncSender, TrySendError};
 
 use anyhow::{anyhow, Result};
 
@@ -79,9 +79,12 @@ impl LogSource for FileSource {
                     let mut lines = reader.lines().skip(read_lines);
                     while let Some(line) = lines.next().await {
                         v.push(line?);
-                        if v.len() == capacity - 1 {
-                            sender.send((self.path.clone(), v))?;
-                            v = Vec::with_capacity(capacity);
+                        if v.len() >= capacity - 1 {
+                            v = match sender.try_send((self.path.clone(), v)) {
+                                Ok(_) => Vec::with_capacity(capacity),
+                                Err(TrySendError::Full((_path, vec))) => vec,
+                                Err(TrySendError::Disconnected((_path, vec))) => vec
+                            };
                         }
                         read_lines += 1;
                     }

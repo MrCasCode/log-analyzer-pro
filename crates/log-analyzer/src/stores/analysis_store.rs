@@ -5,8 +5,8 @@ use std::sync::{Arc};
 use parking_lot::RwLock;
 
 pub trait AnalysisStore {
-    fn add_lines(&self, lines: &[&LogLine]);
-    fn add_search_lines(&self, lines: &[&LogLine]);
+    fn add_lines(&self, lines: &[LogLine]);
+    fn add_search_lines(&self, lines: &[LogLine]);
     fn add_search_query(&self, query: &String);
     fn get_search_query(&self) -> Option<String>;
     fn reset_log(&self);
@@ -36,17 +36,19 @@ impl InMemmoryAnalysisStore {
     }
 }
 
+
+
 impl AnalysisStore for InMemmoryAnalysisStore {
-    fn add_lines(&self, lines: &[&LogLine]) {
+    fn add_lines(&self, lines: &[LogLine]) {
         let mut w = self.log.write();
-        for &line in lines {
+        for line in lines {
             w.push(line.clone());
         }
     }
 
-    fn add_search_lines(&self, lines: &[&LogLine]) {
+    fn add_search_lines(&self, lines: &[LogLine]) {
         let mut w = self.search_log.write();
-        for &line in lines {
+        for line in lines {
             w.push(line.clone());
         }
     }
@@ -112,19 +114,68 @@ impl AnalysisStore for InMemmoryAnalysisStore {
 
 
 impl InMemmoryAnalysisStore {
-    fn find_rolling_window(source: &[LogLine], line: LogLine, elements: usize) -> (Vec<LogLine>, usize) {
-        let closest = match source.binary_search_by(|e| line.index.cmp(&e.index)) {
+
+    fn find_sorted_index(source: &[LogLine], element: &LogLine) -> usize {
+        match source.binary_search_by(|e| e.index.parse::<usize>().unwrap().cmp(&element.index.parse::<usize>().unwrap())) {
             Ok(i) => i,
             Err(i) => i,
-        };
+        }
+    }
+
+    fn find_rolling_window(source: &[LogLine], line: LogLine, elements: usize) -> (Vec<LogLine>, usize) {
+        let closest = InMemmoryAnalysisStore::find_sorted_index(source, &line);
         let from = if (elements / 2) < closest {closest - elements / 2} else {0};
         let to = (closest + elements / 2).min(source.len());
 
         let lines = source[from..to].to_vec();
-        let index = match source.binary_search_by(|e| line.index.cmp(&e.index)) {
-            Ok(i) => i,
-            Err(i) => i,
-        };
+        let index = InMemmoryAnalysisStore::find_sorted_index(&lines, &line);
         (lines, index)
+    }
+
+    fn append_sorted_chunk(v: &mut Vec<LogLine>, new_data: &[LogLine]) {
+        if let Some(first) = new_data.first() {
+            let index = InMemmoryAnalysisStore::find_sorted_index(&v, first);
+            let (a, b) = v.split_at(index);
+            *v = [a, new_data, b].concat();
+        }
+    }
+}
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn log_line_with_index(index: usize) -> LogLine {
+        LogLine { index: index.to_string(), date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: None }
+    }
+
+    #[test]
+    fn test_append_sorted_chunk_at_end() {
+        let mut current_lines: Vec<LogLine> = (0..100).into_iter().map(|index: usize| log_line_with_index(index)).collect();
+        let new_lines: Vec<LogLine> = (100..200).into_iter().map(|index: usize| log_line_with_index(index)).collect();
+
+        InMemmoryAnalysisStore::append_sorted_chunk(&mut current_lines, &new_lines);
+
+        assert!(current_lines[100].index == "100")
+    }
+
+
+    #[test]
+    fn test_append_sorted_chunk_at_mid() {
+        let mut current_lines: Vec<LogLine> = (0..80).into_iter().map(|index: usize| log_line_with_index(index)).collect();
+
+        let mut new_lines: Vec<LogLine> = (200..300).into_iter().map(|index: usize| log_line_with_index(index)).collect();
+        InMemmoryAnalysisStore::append_sorted_chunk(&mut current_lines, &new_lines);
+
+        new_lines = (100..200).into_iter().map(|index: usize| log_line_with_index(index)).collect();
+        InMemmoryAnalysisStore::append_sorted_chunk(&mut current_lines, &new_lines);
+
+        new_lines = (80..100).into_iter().map(|index: usize| log_line_with_index(index)).collect();
+        InMemmoryAnalysisStore::append_sorted_chunk(&mut current_lines, &new_lines);
+
+        assert!(current_lines[100].index == "100")
     }
 }
