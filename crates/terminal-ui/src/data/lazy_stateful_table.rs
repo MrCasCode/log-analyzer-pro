@@ -43,6 +43,15 @@ impl<T> LazyStatefulTable<T> {
             source,
         }
     }
+
+    pub fn reload(&mut self) {
+        self.items = self.source.source(self.offset, CAPACITY);
+
+        self.state.select(match self.state.selected() {
+            Some(i) => Some(i.min(self.items.len() - 1)),
+            _ => None
+        });
+    }
 }
 
 impl<T> Stateful<T> for LazyStatefulTable<T> {
