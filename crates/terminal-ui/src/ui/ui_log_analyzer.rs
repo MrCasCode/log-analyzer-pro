@@ -205,7 +205,7 @@ where
     }
 }
 
-fn draw_bottom_bar<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize)
+fn draw_bottom_bar<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
 {
@@ -310,5 +310,5 @@ where
 
     draw_sidebar(f, app, panels[0]);
     draw_main_panel(f, app, panels[1]);
-    draw_bottom_bar(f, app, ui[1], INDEX_SEARCH);
+    draw_bottom_bar(f, app, ui[1]);
 }

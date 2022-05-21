@@ -275,8 +275,8 @@ impl App {
     }
 
     async fn handle_sources_input(&mut self, key: KeyEvent) {
-        match key.modifiers {
-            KeyModifiers::SHIFT => match key.code {
+        if key.modifiers == KeyModifiers::SHIFT {
+            match key.code {
                 KeyCode::Char('W') => {
                     App::decrease_ratio(&mut self.log_filter_size_percentage, 5, 20)
                 }
@@ -290,9 +290,9 @@ impl App {
                     App::increase_ratio(&mut self.side_main_size_percentage, 5, 50)
                 }
                 _ => {}
-            },
-            _ => {}
-        };
+            };
+        }
+
         match key.code {
             // Navigate up sources
             KeyCode::Up => {
@@ -319,8 +319,8 @@ impl App {
     }
 
     async fn handle_filters_input(&mut self, key: KeyEvent) {
-        match key.modifiers {
-            KeyModifiers::SHIFT => match key.code {
+        if key.modifiers == KeyModifiers::SHIFT {
+            match key.code {
                 KeyCode::Char('W') => {
                     App::decrease_ratio(&mut self.log_filter_size_percentage, 5, 20)
                 }
@@ -334,9 +334,8 @@ impl App {
                     App::increase_ratio(&mut self.side_main_size_percentage, 5, 50)
                 }
                 _ => {}
-            },
-            _ => {}
-        };
+            };
+        }
         match key.code {
             // Navigate up filters
             KeyCode::Up => {
@@ -738,7 +737,8 @@ impl App {
                 }
                 KeyCode::Enter => {
                     if module == Module::SearchResult {
-                        let current_line = &self.search_lines.items[self.search_lines.state.selected().unwrap()];
+                        let current_line =
+                            &self.search_lines.items[self.search_lines.state.selected().unwrap()];
                         let index = current_line.index.clone();
                     }
                 }

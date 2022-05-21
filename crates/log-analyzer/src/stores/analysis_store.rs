@@ -1,5 +1,3 @@
-use rayon::slice::{ParallelSliceMut, ParallelSlice};
-
 use crate::models::{log_line::LogLine};
 use std::sync::{Arc};
 use parking_lot::RwLock;

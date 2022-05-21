@@ -3,10 +3,11 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use parking_lot::RwLock;
-use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use regex::Regex;
 use std::sync::mpsc::{self, SyncSender};
+
+use pariter::{scope, IteratorExt as _};
 
 use crate::domain::apply_filters::apply_filters;
 use crate::domain::apply_format::apply_format;
@@ -88,11 +89,25 @@ impl LogService {
                     .map(|(line, index)| (line, index))
                     .collect();
 
+/*                 elements
+                .chunks(chunk_size.max(num_cpus))
+                .map(|chunk| log.apply_format(&format, chunk))
+                .map(|lines| log.apply_filters(lines))
+                .for_each(|lines| log.apply_search(lines));
+
                 elements
                     .par_chunks(chunk_size.max(num_cpus))
                     .map(|chunk| log.apply_format(&format, chunk))
                     .map(|lines| log.apply_filters(lines))
+                    .for_each(|lines| log.apply_search(lines)); */
+
+                scope(|scope| {
+                elements
+                    .chunks(chunk_size.max(num_cpus))
+                    .parallel_map_scoped(scope, |chunk| log.apply_format(&format, chunk))
+                    .parallel_map_scoped(scope, |lines| log.apply_filters(lines))
                     .for_each(|lines| log.apply_search(lines));
+                });
             }
         });
 
@@ -116,18 +131,17 @@ impl LogService {
     ) -> Vec<LogLine> {
         let mut format_regex = None;
 
-        let r = self.regex_cache.read();
         if let Some(format) = format {
             let format = self.processing_store.get_format(format);
             format_regex = match format {
-                Some(format) => r.get(&format),
+                Some(format) => Some(Regex::new(&format).unwrap()),
                 _ => None,
             };
         }
 
         let mut log_lines: Vec<LogLine> = Vec::with_capacity(line_index.len());
         for (line, index) in line_index {
-            let log_line = apply_format(&format_regex, &line, *index);
+            let log_line = apply_format(&format_regex.as_ref(), &line, *index);
             log_lines.push(log_line);
         }
         log_lines
@@ -215,9 +229,11 @@ impl LogAnalyzer for LogService {
                 let log = r.read();
 
                 if let Some(re) = self.regex_cache.write().put(&regex) {
-                    let search_lines: Vec<LogLine> = log.par_iter().filter(|log_line| {
-                        apply_search(&re, &log_line)
-                    }).map(|l| l.clone()).collect();
+                    let search_lines: Vec<LogLine> = log
+                        .par_iter()
+                        .filter(|log_line| apply_search(&re, &log_line))
+                        .map(|l| l.clone())
+                        .collect();
 
                     self.analysis_store.add_search_lines(&search_lines);
                 }
