@@ -352,8 +352,6 @@ impl App {
                     self.log_analyzer.toggle_filter(alias);
                 }
                 self.update_filters().await;
-                self.log_lines.reload();
-                self.search_lines.reload();
             }
             // Add new filter -> Popup window
             KeyCode::Char('i') | KeyCode::Char('+') | KeyCode::Char('a') => {
