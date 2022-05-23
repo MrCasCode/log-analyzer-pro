@@ -15,9 +15,10 @@ pariter = "0.5.1"
 num_cpus = "1.13.1"
 serde = {version = "1.0.135", features = ["derive"]}
 serde_json = "1.0.78"
-tokio = { version = "1.16.1", features = ["sync"]}
 rustc-hash = { version = "1.1"}
 parking_lot = "0.12.0"
+flume = "0.10.12"
+
 
 [profile.release]
 debug = true

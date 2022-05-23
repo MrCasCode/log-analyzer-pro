@@ -2,6 +2,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use anyhow::Result;
+use flume::Sender;
 use regex::Regex;
 use std::sync::mpsc::{self, SyncSender};
 
@@ -53,7 +54,7 @@ pub struct LogService {
     log_store: Arc<dyn LogStore + Sync + Send>,
     processing_store: Arc<dyn ProcessingStore + Sync + Send>,
     analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
-    sender: SyncSender<(String, Vec<String>)>,
+    sender: Sender<(String, Vec<String>)>,
 }
 
 impl LogService {
@@ -62,7 +63,9 @@ impl LogService {
         processing_store: Arc<dyn ProcessingStore + Sync + Send>,
         analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
     ) -> Arc<Self> {
-        let (sender, receiver) = mpsc::sync_channel(1_000_000_usize);
+
+        let (sender, receiver) = flume::bounded(1_000_000_usize);
+        //let (sender, receiver) = mpsc::sync_channel(1_000_000_usize);
 
         let log_service = Arc::new(Self {
             log_store,

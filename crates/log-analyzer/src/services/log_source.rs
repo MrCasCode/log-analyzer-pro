@@ -1,9 +1,8 @@
-use std::sync::mpsc::{SyncSender, TrySendError};
-
 use anyhow::{anyhow, Result};
 
 use async_std::{fs::File, io::{BufReader, prelude::BufReadExt}, prelude::StreamExt};
 use async_trait::async_trait;
+use flume::{Sender, TrySendError};
 
 #[derive(PartialEq)]
 pub enum SourceType {
@@ -58,7 +57,7 @@ pub async fn create_source(
 
 #[async_trait]
 pub trait LogSource {
-    async fn run(&self, sender: SyncSender<(String, Vec<String>)>) -> Result<()>;
+    async fn run(&self, sender: Sender<(String, Vec<String>)>) -> Result<()>;
 }
 
 pub struct FileSource {
@@ -67,7 +66,7 @@ pub struct FileSource {
 
 #[async_trait]
 impl LogSource for FileSource {
-    async fn run(&self, sender: SyncSender<(String, Vec<String>)>) -> Result<()> {
+    async fn run(&self, sender: Sender<(String, Vec<String>)>) -> Result<()> {
         let mut read_lines = 0_usize;
         let capacity = 1_000_000_usize;
         loop {
@@ -80,11 +79,8 @@ impl LogSource for FileSource {
                     while let Some(line) = lines.next().await {
                         v.push(line?);
                         if v.len() >= capacity - 1 {
-                            v = match sender.try_send((self.path.clone(), v)) {
-                                Ok(_) => Vec::with_capacity(capacity),
-                                Err(TrySendError::Full((_path, vec))) => vec,
-                                Err(TrySendError::Disconnected((_path, vec))) => vec
-                            };
+                            sender.send_async((self.path.clone(), v)).await?;
+                            v = Vec::with_capacity(capacity);
                         }
                         read_lines += 1;
                     }
@@ -104,7 +100,7 @@ pub struct WsSource {
 
 #[async_trait]
 impl LogSource for WsSource {
-    async fn run(&self, _sender: SyncSender<(String, Vec<String>)>) -> Result<()> {
+    async fn run(&self, _sender: Sender<(String, Vec<String>)>) -> Result<()> {
         unimplemented!()
     }
 }
