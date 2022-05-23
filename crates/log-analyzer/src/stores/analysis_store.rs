@@ -13,8 +13,8 @@ pub trait AnalysisStore {
     fn fetch_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
     fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
     fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
-    fn get_log_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize);
-    fn get_search_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize);
+    fn get_log_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize, usize);
+    fn get_search_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize, usize);
     fn get_total_filtered_lines(&self) -> usize;
     fn get_total_searched_lines(&self) -> usize;
 }
@@ -79,13 +79,13 @@ impl AnalysisStore for InMemmoryAnalysisStore {
         log[from.min(log.len())..to.min(log.len())].to_vec()
     }
 
-    fn get_log_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize) {
+    fn get_log_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize, usize) {
         let log = self.log.read();
         InMemmoryAnalysisStore::find_rolling_window(&log, line, elements)
 
     }
 
-    fn get_search_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize) {
+    fn get_search_lines_containing(&self, line: LogLine, elements: usize) -> (Vec<LogLine>, usize, usize) {
         let search_log = self.search_log.read();
         InMemmoryAnalysisStore::find_rolling_window(&search_log, line, elements)
 
@@ -120,14 +120,16 @@ impl InMemmoryAnalysisStore {
         }
     }
 
-    fn find_rolling_window(source: &[LogLine], line: LogLine, elements: usize) -> (Vec<LogLine>, usize) {
+    /// Find a window of elements containing the target in the middle
+    /// Returns (elements, offset, index)
+    fn find_rolling_window(source: &[LogLine], line: LogLine, elements: usize) -> (Vec<LogLine>, usize, usize) {
         let closest = InMemmoryAnalysisStore::find_sorted_index(source, &line);
         let from = if (elements / 2) < closest {closest - elements / 2} else {0};
         let to = (closest + elements / 2).min(source.len());
 
         let lines = source[from..to].to_vec();
         let index = InMemmoryAnalysisStore::find_sorted_index(&lines, &line);
-        (lines, index)
+        (lines, from, index)
     }
 
     fn append_sorted_chunk(v: &mut Vec<LogLine>, new_data: &[LogLine]) {

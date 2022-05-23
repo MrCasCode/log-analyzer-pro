@@ -36,8 +36,10 @@ pub const INDEX_FILTER_BLUE_COLOR: usize = INDEX_FILTER_GREEN_COLOR + 1;
 pub const INDEX_FILTER_OK_BUTTON: usize = INDEX_FILTER_BLUE_COLOR + 1;
 /* ------ SEARCH INDEXES ------- */
 pub const INDEX_SEARCH: usize = INDEX_FILTER_OK_BUTTON + 1;
+/* ------ NAVIGATION INDEXES ------- */
+pub const INDEX_NAVIGATION: usize = INDEX_SEARCH + 1;
 /* ----------------------------------- */
-pub const INDEX_MAX: usize = INDEX_SEARCH + 1;
+pub const INDEX_MAX: usize = INDEX_NAVIGATION + 1;
 /* ----------------------------------- */
 
 pub struct PopupInteraction {
@@ -55,6 +57,7 @@ pub enum Module {
     SearchResult,
     SourcePopup,
     FilterPopup,
+    NavigationPopup,
     ErrorPopup,
     None,
 }
@@ -67,6 +70,15 @@ impl LazySource<LogLine> for LogSourcer {
     fn source(&self, from: usize, to: usize) -> Vec<LogLine> {
         self.log_analyzer.get_log_lines(from, to)
     }
+
+    fn source_elements_containing(
+        &self,
+        element: LogLine,
+        quantity: usize,
+    ) -> (Vec<LogLine>, usize, usize) {
+        self.log_analyzer
+            .get_log_lines_containing(element, quantity)
+    }
 }
 struct SearchSourcer {
     log_analyzer: Box<Arc<dyn LogAnalyzer>>,
@@ -75,6 +87,15 @@ struct SearchSourcer {
 impl LazySource<LogLine> for SearchSourcer {
     fn source(&self, from: usize, to: usize) -> Vec<LogLine> {
         self.log_analyzer.get_search_lines(from, to)
+    }
+
+    fn source_elements_containing(
+        &self,
+        element: LogLine,
+        quantity: usize,
+    ) -> (Vec<LogLine>, usize, usize) {
+        self.log_analyzer
+            .get_search_lines_containing(element, quantity)
     }
 }
 
@@ -91,6 +112,8 @@ pub struct App {
 
     pub show_source_popup: bool,
     pub show_filter_popup: bool,
+    pub show_error_message: bool,
+    pub show_navigation_popup: bool,
 
     pub input_buffers: Vec<Input>,
     pub input_buffer_index: usize,
@@ -117,8 +140,6 @@ pub struct App {
     pub log_search_size_percentage: u16,
 
     pub log_columns: Vec<(String, bool)>,
-
-    pub show_error_message: bool,
 
     pub popup: PopupInteraction,
 }
@@ -154,6 +175,8 @@ impl App {
             selected_module: Module::Sources,
             show_source_popup: false,
             show_filter_popup: false,
+            show_navigation_popup: false,
+            show_error_message: false,
 
             input_buffers: vec![Input::default(); INDEX_MAX],
             input_buffer_index: 0,
@@ -178,7 +201,6 @@ impl App {
                 .map(|column| (column, true))
                 .collect(),
 
-            show_error_message: false,
             popup: PopupInteraction {
                 response: true,
                 calling_module: Module::None,
@@ -269,6 +291,7 @@ impl App {
             Module::SearchResult => self.handle_search_result_input(key).await,
             Module::SourcePopup => self.handle_source_popup_input(key).await,
             Module::FilterPopup => self.handle_filter_popup_input(key).await,
+            Module::NavigationPopup => self.handle_navigation_popup_input(key).await,
             Module::ErrorPopup => self.handle_error_popup_input(key).await,
             _ => {}
         }
@@ -543,6 +566,50 @@ impl App {
         }
     }
 
+    async fn handle_navigation_popup_input(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Enter => {
+                match self.input_buffers[INDEX_NAVIGATION]
+                    .value()
+                    .parse::<usize>()
+                {
+                    Ok(index) => {
+                        self.show_navigation_popup = false;
+                        self.selected_module = self.popup.calling_module;
+
+                        match self.selected_module {
+                            Module::Logs => {
+                                let mut element = LogLine::default();
+                                element.index = index.to_string();
+                                self.log_lines.navigate_to(element);
+                            }
+                            Module::SearchResult => {
+                                let mut element = LogLine::default();
+                                element.index = index.to_string();
+
+                                self.search_lines.navigate_to(element);
+                            }
+                            _ => {}
+                        }
+                    }
+                    Err(err) => {
+                        self.selected_module = Module::ErrorPopup;
+                        self.show_error_message = true;
+                        self.popup.message = err.to_string();
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                self.show_navigation_popup = false;
+                self.selected_module = self.popup.calling_module;
+            }
+            _ => {
+                input_backend::to_input_request(Event::Key(key))
+                    .map(|req| self.input_buffers[INDEX_NAVIGATION].handle(req));
+            }
+        }
+    }
+
     async fn handle_error_popup_input(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Enter | KeyCode::Esc => {
@@ -637,6 +704,7 @@ impl App {
                 }
             }
             Module::ErrorPopup => (),
+            Module::NavigationPopup => (),
             Module::None => self.selected_module = Module::Logs,
         }
     }
@@ -674,7 +742,12 @@ impl App {
                 KeyCode::Char('D') => {
                     App::increase_ratio(&mut self.side_main_size_percentage, 5, 50)
                 }
-                KeyCode::Char('G') => {}
+                KeyCode::Char('G') => {
+                    self.input_buffer_index = INDEX_NAVIGATION;
+                    self.show_navigation_popup = true;
+                    self.popup.calling_module = module;
+                    self.selected_module = Module::NavigationPopup;
+                }
                 _ => {}
             },
             _ => match key.code {
@@ -735,9 +808,11 @@ impl App {
                 }
                 KeyCode::Enter => {
                     if module == Module::SearchResult {
-                        let current_line =
-                            &self.search_lines.items[self.search_lines.state.selected().unwrap()];
-                        let index = current_line.index.clone();
+                        let current_line = self.search_lines.items
+                            [self.search_lines.state.selected().unwrap()]
+                        .clone();
+
+                        self.log_lines.navigate_to(current_line);
                     }
                 }
                 // Nothing

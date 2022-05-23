@@ -7,6 +7,7 @@ const ROOM: usize = 100;
 
 pub trait LazySource<T> {
     fn source(&self, from: usize, to: usize) -> Vec<T>;
+    fn source_elements_containing(&self, element: T, quantity: usize) -> (Vec<T>, usize, usize);
 }
 
 enum Area {
@@ -49,8 +50,32 @@ impl<T> LazyStatefulTable<T> {
 
         self.state.select(match self.state.selected() {
             Some(i) => Some(i.min(self.items.len() - 1)),
-            _ => None
+            _ => None,
         });
+    }
+
+    pub fn update_items(&mut self, items: Vec<T>, offset: usize, index: Option<usize>) {
+        self.items = items;
+        self.offset = offset;
+        self.state.select(index);
+    }
+
+    pub fn navigate_to(&mut self, element: T) {
+        let source = self.source.source_elements_containing(element, CAPACITY);
+
+        self.items = source.0;
+        self.offset = source.1;
+        self.state.select(Some(source.2));
+
+    }
+
+    fn select_and_set_scroll_on_top(&mut self, index: usize) {
+        // Need to manually set private field offset when scrolling up for smooth experience
+        // Requested to make this public https://github.com/fdehau/tui-rs/issues/626
+        // but using unsafe in the meantime
+        unsafe {
+            self.state = std::mem::transmute::<(usize, Option<usize>), TableState>((index, None))
+        }
     }
 }
 
@@ -130,14 +155,7 @@ impl<T> Stateful<T> for LazyStatefulTable<T> {
 
                         let selected = i + received_elements - if i > 0 { 1 } else { 0 };
 
-                        // Need to manually set private field offset when scrolling up for smooth experience
-                        // Requested to make this public https://github.com/fdehau/tui-rs/issues/626
-                        // but using unsafe in the meantime
-                        unsafe {
-                            self.state = std::mem::transmute::<(usize, Option<usize>), TableState>(
-                                (selected, None),
-                            )
-                        }
+                        self.select_and_set_scroll_on_top(selected);
 
                         selected
                     }
@@ -167,6 +185,14 @@ mod tests {
     impl<T: Clone> LazySource<T> for TestSourcer<T> {
         fn source(&self, from: usize, to: usize) -> Vec<T> {
             self.items[from.min(self.items.len())..to.min(self.items.len())].to_vec()
+        }
+
+        fn source_elements_containing(
+            &self,
+            element: T,
+            quantity: usize,
+        ) -> (Vec<T>, usize, usize) {
+            todo!()
         }
     }
 
