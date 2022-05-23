@@ -1,16 +1,14 @@
-use std::sync::{Arc, RwLock};
-
 use tui::widgets::TableState;
 
 use super::Stateful;
 
 pub struct StatefulTable<T> {
     pub state: TableState,
-    pub items: Arc<RwLock<Vec<T>>>,
+    pub items: Vec<T>,
 }
 
 impl<T> StatefulTable<T> {
-    pub fn with_items(items: Arc<RwLock<Vec<T>>>) -> StatefulTable<T> {
+    pub fn with_items(items: Vec<T>) -> StatefulTable<T> {
         StatefulTable {
             state: TableState::default(),
             items,
@@ -20,10 +18,10 @@ impl<T> StatefulTable<T> {
 
 impl<T> Stateful<T> for StatefulTable<T> {
     fn next(&mut self) -> usize {
-        if self.items.read().unwrap().len() > 0 {
+        if self.items.len() > 0 {
             let i = match self.state.selected() {
                 Some(i) => {
-                    if i >= self.items.read().unwrap().len() - 1 {
+                    if i >= self.items.len() - 1 {
                         0
                     } else {
                         i + 1
@@ -37,11 +35,11 @@ impl<T> Stateful<T> for StatefulTable<T> {
     }
 
     fn previous(&mut self) -> usize {
-        if self.items.read().unwrap().len() > 0 {
+        if self.items.len() > 0 {
             let i = match self.state.selected() {
                 Some(i) => {
                     if i == 0 {
-                        self.items.read().unwrap().len() - 1
+                        self.items.len() - 1
                     } else {
                         i - 1
                     }

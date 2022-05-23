@@ -654,6 +654,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -1077,7 +1078,9 @@ dependencies = [
  "anyhow",
  "async-std",
  "crossterm 0.23.1",
+ "flume",
  "log-analyzer",
+ "tokio",
  "tui",
  "tui-input",
  "unicode-width",
@@ -1092,6 +1095,15 @@ dependencies = [
  "libc",
  "wasi",
  "winapi",
+]
+
+[[package]]
+name = "tokio"
+version = "1.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4903bf0427cf68dddd5aa6a93220756f8be0c34fcfa9f5e6191e103e15a31395"
+dependencies = [
+ "pin-project-lite",
 ]
 
 [[package]]

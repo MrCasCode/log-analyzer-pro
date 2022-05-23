@@ -13,6 +13,8 @@ tui = "0.17.0"
 unicode-width = "0.1.9"
 log-analyzer = { path = '../log-analyzer'}
 tui-input = "0.3.0"
+flume = "0.10.12"
+tokio = {version = "1.18.2", features = ["sync"]}
 
 [profile.release]
 debug = true

@@ -38,8 +38,7 @@ where
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::Black)));
     let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
-    let r = app.sources.items.read().unwrap();
-    let rows = r.iter().map(|item| {
+    let rows = app.sources.items.iter().map(|item| {
         let get_enabled_widget = |enabled: bool| match enabled {
             true => Span::styled("V", Style::default().fg(SELECTED_COLOR)),
             false => Span::styled("X", Style::default().fg(Color::Gray)),
@@ -89,8 +88,8 @@ where
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::Black)));
     let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
-    let r = app.filters.items.read().unwrap();
-    let rows = r.iter().map(|item| {
+
+    let rows = app.filters.items.iter().map(|item| {
         let get_enabled_widget = |enabled: bool| match enabled {
             true => Span::styled("V", Style::default().fg(SELECTED_COLOR)),
             false => Span::styled("X", Style::default().fg(Color::Gray)),
@@ -116,7 +115,13 @@ where
 {
     let left_modules = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(app.log_filter_size_percentage), Constraint::Percentage(100 - app.log_filter_size_percentage)].as_ref())
+        .constraints(
+            [
+                Constraint::Percentage(app.log_filter_size_percentage),
+                Constraint::Percentage(100 - app.log_filter_size_percentage),
+            ]
+            .as_ref(),
+        )
         .split(area);
 
     draw_sources(f, app, left_modules[0]);
@@ -305,7 +310,10 @@ where
     // Create two chunks with equal horizontal screen space
     let panels = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(app.side_main_size_percentage), Constraint::Percentage(100 - app.side_main_size_percentage)])
+        .constraints([
+            Constraint::Percentage(app.side_main_size_percentage),
+            Constraint::Percentage(100 - app.side_main_size_percentage),
+        ])
         .split(ui[0]);
 
     draw_sidebar(f, app, panels[0]);

@@ -26,7 +26,7 @@ use tui::{
     backend::{Backend, CrosstermBackend},
     Frame, Terminal,
 };
-use ui::{ui_log_analyzer::draw_log_analyzer_view, ui_source_popup::draw_source_popup, ui_filter_popup::draw_filter_popup, ui_error_message::draw_error_popup, ui_navigation_popup::draw_navigation_popup};
+use ui::{ui_log_analyzer::draw_log_analyzer_view, ui_source_popup::draw_source_popup, ui_filter_popup::draw_filter_popup, ui_error_message::draw_error_popup, ui_navigation_popup::draw_navigation_popup, ui_loading_popup::draw_loading_popup};
 
 
 
@@ -176,5 +176,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     if app.show_error_message {
         draw_error_popup(f, app)
+    }
+
+    if app.processing.is_processing {
+        draw_loading_popup(f, app)
     }
 }

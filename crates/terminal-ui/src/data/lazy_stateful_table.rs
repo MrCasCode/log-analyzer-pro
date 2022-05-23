@@ -34,7 +34,7 @@ pub struct LazyStatefulTable<T> {
     source: Box<dyn LazySource<T>>,
 }
 
-impl<T> LazyStatefulTable<T> {
+impl<T: Clone> LazyStatefulTable<T> {
     pub fn new(source: Box<dyn LazySource<T>>) -> LazyStatefulTable<T> {
         let items = source.source(0, CAPACITY);
         LazyStatefulTable {
@@ -54,11 +54,6 @@ impl<T> LazyStatefulTable<T> {
         });
     }
 
-    pub fn update_items(&mut self, items: Vec<T>, offset: usize, index: Option<usize>) {
-        self.items = items;
-        self.offset = offset;
-        self.state.select(index);
-    }
 
     pub fn navigate_to(&mut self, element: T) {
         let source = self.source.source_elements_containing(element, CAPACITY);
@@ -69,6 +64,18 @@ impl<T> LazyStatefulTable<T> {
 
     }
 
+    pub fn get_selected_item(&self) -> Option<T>{
+        match self.state.selected() {
+            Some(i) => Some(self.items[i].clone()),
+            None => None
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.state.select(None);
+        self.items.clear();
+    }
+
     fn select_and_set_scroll_on_top(&mut self, index: usize) {
         // Need to manually set private field offset when scrolling up for smooth experience
         // Requested to make this public https://github.com/fdehau/tui-rs/issues/626
@@ -77,9 +84,10 @@ impl<T> LazyStatefulTable<T> {
             self.state = std::mem::transmute::<(usize, Option<usize>), TableState>((index, None))
         }
     }
+
 }
 
-impl<T> Stateful<T> for LazyStatefulTable<T> {
+impl<T: Clone> Stateful<T> for LazyStatefulTable<T> {
     fn next(&mut self) -> usize {
         if self.items.is_empty() {
             self.items = self.source.source(0, CAPACITY)

@@ -2,9 +2,9 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use log_analyzer::models::filter::FilterAction;
 use log_analyzer::models::{filter::Filter, log_line::LogLine};
-use log_analyzer::services::log_service::LogAnalyzer;
+use log_analyzer::services::log_service::{Event as LogEvent, LogAnalyzer};
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use tui_input::backend::crossterm as input_backend;
 use tui_input::Input;
@@ -46,6 +46,36 @@ pub struct PopupInteraction {
     pub response: bool,
     pub message: String,
     pub calling_module: Module,
+}
+
+pub struct Processing {
+    pub is_processing: bool,
+    pub focus_on: LogLine,
+}
+
+impl Processing {
+    fn set_focus(&mut self, focus: Option<LogLine>) {
+        self.focus_on = match focus {
+            Some(focus) => focus,
+            None => {
+                let mut default_line = LogLine::default();
+                default_line.index = "0".to_string();
+                default_line
+            }
+        }
+    }
+}
+
+impl Default for Processing {
+    fn default() -> Self {
+        let mut default_line = LogLine::default();
+        default_line.index = "0".to_string();
+
+        Self {
+            is_processing: false,
+            focus_on: default_line,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -142,6 +172,8 @@ pub struct App {
     pub log_columns: Vec<(String, bool)>,
 
     pub popup: PopupInteraction,
+    pub processing: Processing,
+    event_receiver: tokio::sync::broadcast::Receiver<LogEvent>,
 }
 
 impl App {
@@ -154,14 +186,12 @@ impl App {
                 .map(|format| format.alias),
         );
 
-        let sources = Arc::new(RwLock::new(log_analyzer.get_logs()));
-        let filters = Arc::new(RwLock::new(
-            log_analyzer
-                .get_filters()
-                .iter()
-                .map(|(enabled, filter)| (*enabled, filter.alias.clone()))
-                .collect(),
-        ));
+        let sources = log_analyzer.get_logs();
+        let filters = log_analyzer
+            .get_filters()
+            .iter()
+            .map(|(enabled, filter)| (*enabled, filter.alias.clone()))
+            .collect();
 
         let log_sourcer = LogSourcer {
             log_analyzer: log_analyzer.clone(),
@@ -169,6 +199,8 @@ impl App {
         let search_sourcer = SearchSourcer {
             log_analyzer: log_analyzer.clone(),
         };
+
+        let event_receiver = log_analyzer.on_event();
 
         App {
             log_analyzer,
@@ -206,6 +238,8 @@ impl App {
                 calling_module: Module::None,
                 message: String::new(),
             },
+            processing: Processing::default(),
+            event_receiver,
         }
     }
 
@@ -256,7 +290,7 @@ impl App {
 
     pub async fn update_sources(&mut self) {
         let sources = self.log_analyzer.get_logs();
-        self.sources = StatefulTable::with_items(Arc::new(RwLock::new(sources)))
+        self.sources = StatefulTable::with_items(sources)
     }
 
     pub async fn update_filters(&mut self) {
@@ -269,17 +303,79 @@ impl App {
 
         let index = self.filters.state.selected();
         let length: usize = filters.len();
-        self.filters = StatefulTable::with_items(Arc::new(RwLock::new(filters)));
+        self.filters = StatefulTable::with_items(filters);
 
         if index.is_some() && length >= index.unwrap() {
             self.filters.state.select(index)
         }
     }
 
-    async fn on_event(&mut self) {}
+    async fn pull_events(&mut self) {
+        let mut events = Vec::new();
+        while let Ok(event) = self.event_receiver.try_recv() {
+            events.push(event);
+        }
+
+        // Reload logs when some lines are received and there are no items displayed
+        if !self.processing.is_processing
+            && self.log_lines.items.is_empty()
+            && events.iter().any(|e| matches!(e, LogEvent::NewLines(_, _)))
+        {
+            self.log_lines.reload();
+        }
+
+        // Reload search logs when some search lines are received and there are no items displayed
+        if !self.processing.is_processing
+            && self.search_lines.items.is_empty()
+            && events
+                .iter()
+                .any(|e| matches!(e, LogEvent::NewSearchLines(_, _)))
+        {
+            self.search_lines.reload();
+        }
+
+        // Handle enter filtering
+        if events.iter().any(|e| matches!(e, LogEvent::Filtering)) {
+            self.processing.is_processing = true;
+            self.processing
+                .set_focus(self.log_lines.get_selected_item());
+            self.log_lines.clear();
+            self.search_lines.clear();
+        }
+
+        // Handle exit filtering
+        if self.processing.is_processing && events.iter().any(|e| {
+            matches!(e, LogEvent::FilterFinished)
+                || matches!(e, LogEvent::NewLines(start, end) if *start <= self.processing.focus_on.index.parse::<usize>().unwrap() && *end >= self.processing.focus_on.index.parse::<usize>().unwrap())
+        }) {
+            self.log_lines.navigate_to(self.processing.focus_on.clone());
+            self.search_lines.navigate_to(self.processing.focus_on.clone());
+
+            self.processing.is_processing = false;
+            self.processing = Processing::default();
+
+        }
+
+        // Handle enter searching
+        if events.iter().any(|e| matches!(e, LogEvent::Searching)) {
+            self.processing.is_processing = true;
+            self.processing
+                .set_focus(self.search_lines.get_selected_item());
+            self.search_lines.clear();
+        }
+
+        // Handle exit searching
+        if events.iter().any(|e| matches!(e, LogEvent::SearchFinished)) {
+            self.processing.is_processing = false;
+
+            self.search_lines
+                .navigate_to(self.processing.focus_on.clone());
+            self.processing = Processing::default();
+        }
+    }
 
     pub async fn on_tick(&mut self) {
-        self.on_event().await;
+        self.pull_events().await;
     }
 
     pub async fn handle_input(&mut self, key: KeyEvent) {
@@ -371,7 +467,7 @@ impl App {
             // Toggle enabled/disabled source
             KeyCode::Enter => {
                 if let Some(index) = self.filters.state.selected() {
-                    let (_, alias) = &self.filters.items.read().unwrap()[index];
+                    let (_, alias) = &self.filters.items[index];
                     self.log_analyzer.toggle_filter(alias);
                 }
                 self.update_filters().await;
@@ -808,9 +904,7 @@ impl App {
                 }
                 KeyCode::Enter => {
                     if module == Module::SearchResult {
-                        let current_line = self.search_lines.items
-                            [self.search_lines.state.selected().unwrap()]
-                        .clone();
+                        let current_line = self.search_lines.get_selected_item().unwrap();
 
                         self.log_lines.navigate_to(current_line);
                     }

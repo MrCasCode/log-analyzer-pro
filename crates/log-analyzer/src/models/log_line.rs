@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -117,4 +119,40 @@ impl<'a> IntoIterator for &'a &'a LogLine {
             &self.payload,
         ])
     }
+}
+
+impl Ord for LogLine {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self.index.parse::<usize>(), other.index.parse::<usize>()) {
+            (Ok(index), Ok(other)) => match (index, other) {
+                (index, other) if index < other => Ordering::Less,
+                (index, other) if index == other => Ordering::Equal,
+                _ => Ordering::Greater,
+            },
+            _ => Ordering::Equal
+        }
+    }
+}
+
+impl PartialOrd for LogLine {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self.index.parse::<usize>(), other.index.parse::<usize>()) {
+            (Ok(index), Ok(other)) => match (index, other) {
+                (index, other) if index < other => Some(Ordering::Less),
+                (index, other) if index == other => Some(Ordering::Equal),
+                _ => Some(Ordering::Greater),
+            },
+            _ => None
+        }
+    }
+}
+
+impl PartialEq for LogLine {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index && self.date == other.date && self.timestamp == other.timestamp && self.app == other.app && self.severity == other.severity && self.function == other.function && self.payload == other.payload && self.color == other.color
+    }
+}
+
+impl Eq for LogLine {
+
 }
