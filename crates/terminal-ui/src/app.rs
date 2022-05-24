@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tui_input::backend::crossterm as input_backend;
 use tui_input::Input;
 
-use crate::data::lazy_stateful_table::{LazySource, LazyStatefulTable};
+use crate::data::lazy_stateful_table::{LazySource, LazyStatefulTable, CAPACITY};
 use crate::data::stateful_list::StatefulList;
 use crate::data::stateful_table::StatefulTable;
 use crate::data::Stateful;
@@ -171,6 +171,8 @@ pub struct App {
 
     pub log_columns: Vec<(String, bool)>,
 
+    pub auto_scroll: bool,
+
     pub popup: PopupInteraction,
     pub processing: Processing,
     event_receiver: tokio::sync::broadcast::Receiver<LogEvent>,
@@ -232,6 +234,7 @@ impl App {
                 .into_iter()
                 .map(|column| (column, true))
                 .collect(),
+            auto_scroll: false,
 
             popup: PopupInteraction {
                 response: true,
@@ -318,7 +321,7 @@ impl App {
 
         // Reload logs when some lines are received and there are no items displayed
         if !self.processing.is_processing
-            && self.log_lines.items.is_empty()
+            && self.log_lines.items.len() < CAPACITY
             && events.iter().any(|e| matches!(e, LogEvent::NewLines(_, _)))
         {
             self.log_lines.reload();
@@ -326,12 +329,25 @@ impl App {
 
         // Reload search logs when some search lines are received and there are no items displayed
         if !self.processing.is_processing
-            && self.search_lines.items.is_empty()
+            && self.search_lines.items.len() < CAPACITY
             && events
                 .iter()
                 .any(|e| matches!(e, LogEvent::NewSearchLines(_, _)))
         {
             self.search_lines.reload();
+        }
+
+        // Auto scroll
+        if self.auto_scroll && events.iter().any(|e| matches!(e, LogEvent::NewLines(_, _))) {
+            self.log_lines.navigate_to_bottom();
+        }
+
+        if self.auto_scroll
+            && events
+                .iter()
+                .any(|e| matches!(e, LogEvent::NewSearchLines(_, _)))
+        {
+            self.search_lines.navigate_to_bottom();
         }
 
         // Handle enter filtering
@@ -881,27 +897,15 @@ impl App {
                 }
                 // Navigate down log_lines
                 KeyCode::Right => self.horizontal_offset += 10,
-                KeyCode::Char('I') | KeyCode::Char('i') => {
-                    self.log_columns[0].1 = !self.log_columns[0].1
-                }
-                KeyCode::Char('D') | KeyCode::Char('d') => {
-                    self.log_columns[1].1 = !self.log_columns[1].1
-                }
-                KeyCode::Char('T') | KeyCode::Char('t') => {
-                    self.log_columns[2].1 = !self.log_columns[2].1
-                }
-                KeyCode::Char('A') | KeyCode::Char('a') => {
-                    self.log_columns[3].1 = !self.log_columns[3].1
-                }
-                KeyCode::Char('S') | KeyCode::Char('s') => {
-                    self.log_columns[4].1 = !self.log_columns[4].1
-                }
-                KeyCode::Char('F') | KeyCode::Char('f') => {
-                    self.log_columns[5].1 = !self.log_columns[5].1
-                }
-                KeyCode::Char('P') | KeyCode::Char('p') => {
-                    self.log_columns[6].1 = !self.log_columns[6].1
-                }
+                // Toogle columns
+                KeyCode::Char('i') => self.log_columns[0].1 = !self.log_columns[0].1,
+                KeyCode::Char('d') => self.log_columns[1].1 = !self.log_columns[1].1,
+                KeyCode::Char('t') => self.log_columns[2].1 = !self.log_columns[2].1,
+                KeyCode::Char('a') => self.log_columns[3].1 = !self.log_columns[3].1,
+                KeyCode::Char('s') => self.log_columns[4].1 = !self.log_columns[4].1,
+                KeyCode::Char('f') => self.log_columns[5].1 = !self.log_columns[5].1,
+                KeyCode::Char('p') => self.log_columns[6].1 = !self.log_columns[6].1,
+                KeyCode::Char('r') => self.auto_scroll = !self.auto_scroll,
                 KeyCode::Enter => {
                     if module == Module::SearchResult {
                         let current_line = self.search_lines.get_selected_item().unwrap();

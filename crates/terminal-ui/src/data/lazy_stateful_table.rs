@@ -2,7 +2,7 @@ use tui::widgets::TableState;
 
 use super::Stateful;
 
-const CAPACITY: usize = 1000;
+pub const CAPACITY: usize = 1000;
 const ROOM: usize = 100;
 
 pub trait LazySource<T> {
@@ -62,6 +62,16 @@ impl<T: Clone> LazyStatefulTable<T> {
         self.offset = source.1;
         self.state.select(Some(source.2));
 
+    }
+
+
+    pub fn navigate_to_bottom(&mut self) {
+        let mut current = self.next();
+        let mut next = self.next();
+        while current != next {
+            current = next;
+            next = self.next();
+        }
     }
 
     pub fn get_selected_item(&self) -> Option<T>{

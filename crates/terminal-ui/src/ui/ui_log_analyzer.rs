@@ -224,7 +224,13 @@ where
         .split(area);
 
     let auto_scroll = Paragraph::new("AUTO SCROLL")
-        .style(Style::default().add_modifier(Modifier::DIM))
+        .style(
+            match app.auto_scroll {
+                false => Style::default().add_modifier(Modifier::DIM),
+                true => SELECTED_STYLE,
+            }
+            ,
+        )
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
 
