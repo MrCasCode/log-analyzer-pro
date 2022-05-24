@@ -66,7 +66,7 @@ impl<T: Clone> LazyStatefulTable<T> {
 
     pub fn get_selected_item(&self) -> Option<T>{
         match self.state.selected() {
-            Some(i) => Some(self.items[i].clone()),
+            Some(i) => self.items.get(i).and_then(|v| Some(v.clone())),
             None => None
         }
     }
