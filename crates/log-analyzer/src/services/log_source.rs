@@ -1,8 +1,15 @@
+use std::time::Duration;
+
 use anyhow::{anyhow, Result};
 
-use async_std::{fs::File, io::{BufReader, prelude::BufReadExt}, prelude::StreamExt};
+use async_std::net::TcpStream;
+use async_std::{
+    fs::File,
+    io::{prelude::BufReadExt, BufReader},
+    prelude::StreamExt,
+};
 use async_trait::async_trait;
-use flume::{Sender, TrySendError};
+use flume::Sender;
 
 #[derive(PartialEq)]
 pub enum SourceType {
@@ -47,10 +54,12 @@ pub async fn create_source(
             true => Ok(Box::new(FileSource {
                 path: source_address,
             })),
-            false => Err(anyhow!("Could not open file.\nPlease that path is correct")),
+            false => Err(anyhow!(
+                "Could not open file.\nPlease ensure that path is correct"
+            )),
         },
         SourceType::WS => Ok(Box::new(WsSource {
-            _address: source_address,
+            address: source_address,
         })),
     }
 }
@@ -95,12 +104,31 @@ impl LogSource for FileSource {
 }
 
 pub struct WsSource {
-    _address: String,
+    address: String,
 }
 
 #[async_trait]
 impl LogSource for WsSource {
-    async fn run(&self, _sender: Sender<(String, Vec<String>)>) -> Result<()> {
-        unimplemented!()
+    async fn run(&self, sender: Sender<(String, Vec<String>)>) -> Result<()> {
+        loop {
+            let stream = match TcpStream::connect(&self.address).await {
+                Ok(stream) => Some(stream),
+                Err(_) => None,
+            };
+            if let Some(stream) = stream {
+                loop {
+                    let mut lines_from_server = BufReader::new(&stream).lines().fuse();
+                    match lines_from_server.next().await {
+                        Some(line) => {
+                            let line = line?;
+                            println!("{}", line);
+                        }
+                        None => break,
+                    }
+                }
+            }
+            async_std::task::sleep(Duration::from_secs(3)).await;
+        }
+        Ok(())
     }
 }
