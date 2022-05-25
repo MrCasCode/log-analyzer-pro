@@ -290,12 +290,12 @@ impl LogAnalyzer for LogService {
                                     .flatten()
                                     .collect::<Vec<LogLine>>();
                                 analysis_store.add_search_lines(&search_lines);
+                                sender.send(Event::SearchFinished).unwrap_or_default();
                             })
                             .unwrap();
                         })
                         .unwrap();
 
-                    sender.send(Event::SearchFinished).unwrap_or_default();
                 }
             }
             Err(_) => {}

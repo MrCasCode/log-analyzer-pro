@@ -10,6 +10,7 @@ use async_std::{
 };
 use async_trait::async_trait;
 use flume::Sender;
+use parking_lot::RwLock;
 
 #[derive(PartialEq)]
 pub enum SourceType {
@@ -53,6 +54,7 @@ pub async fn create_source(
         SourceType::FILE => match is_file_path_valid(&source_address).await {
             true => Ok(Box::new(FileSource {
                 path: source_address,
+                read_lines: RwLock::new(0)
             })),
             false => Err(anyhow!(
                 "Could not open file.\nPlease ensure that path is correct"
@@ -71,12 +73,12 @@ pub trait LogSource {
 
 pub struct FileSource {
     path: String,
+    read_lines: RwLock<usize>
 }
 
 #[async_trait]
 impl LogSource for FileSource {
     async fn run(&self, sender: Sender<(String, Vec<String>)>) -> Result<()> {
-        let mut read_lines = 0_usize;
         let capacity = 1_000_000_usize;
         loop {
             let file = File::open(&self.path).await;
@@ -84,14 +86,14 @@ impl LogSource for FileSource {
                 Ok(f) => {
                     let reader = BufReader::with_capacity(2_usize.pow(26), f);
                     let mut v = Vec::with_capacity(capacity);
-                    let mut lines = reader.lines().skip(read_lines);
+                    let mut lines = reader.lines().skip(*self.read_lines.read());
                     while let Some(line) = lines.next().await {
                         v.push(line?);
                         if v.len() >= capacity - 1 {
                             sender.send_async((self.path.clone(), v)).await?;
                             v = Vec::with_capacity(capacity);
                         }
-                        read_lines += 1;
+                        *self.read_lines.write() += 1;
                     }
                     sender.send((self.path.clone(), v))?;
                 }
