@@ -16,7 +16,7 @@ pub struct LogLine {
 }
 
 impl LogLine {
-   pub fn columns() -> Vec<String> {
+    pub fn columns() -> Vec<String> {
         vec![
             "Index".to_string(),
             "Date".to_string(),
@@ -37,8 +37,19 @@ impl LogLine {
             "Severity" => Some(&self.severity),
             "Function" => Some(&self.function),
             "Payload" => Some(&self.payload),
-            _ => None
+            _ => None,
         }
+    }
+
+    pub fn values(&self) -> Vec<(&str, &String)> {
+        vec![
+            ("Date", &self.date),
+            ("Timestamp", &self.timestamp),
+            ("App", &self.app),
+            ("Severity", &self.severity),
+            ("Function", &self.function),
+            ("Payload", &self.payload),
+        ]
     }
 }
 
@@ -129,7 +140,7 @@ impl Ord for LogLine {
                 (index, other) if index == other => Ordering::Equal,
                 _ => Ordering::Greater,
             },
-            _ => Ordering::Equal
+            _ => Ordering::Equal,
         }
     }
 }
@@ -142,17 +153,22 @@ impl PartialOrd for LogLine {
                 (index, other) if index == other => Some(Ordering::Equal),
                 _ => Some(Ordering::Greater),
             },
-            _ => None
+            _ => None,
         }
     }
 }
 
 impl PartialEq for LogLine {
     fn eq(&self, other: &Self) -> bool {
-        self.index == other.index && self.date == other.date && self.timestamp == other.timestamp && self.app == other.app && self.severity == other.severity && self.function == other.function && self.payload == other.payload && self.color == other.color
+        self.index == other.index
+            && self.date == other.date
+            && self.timestamp == other.timestamp
+            && self.app == other.app
+            && self.severity == other.severity
+            && self.function == other.function
+            && self.payload == other.payload
+            && self.color == other.color
     }
 }
 
-impl Eq for LogLine {
-
-}
+impl Eq for LogLine {}

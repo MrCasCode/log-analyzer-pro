@@ -13,6 +13,7 @@ use pariter::{scope, IteratorExt as _};
 use crate::domain::apply_filters::apply_filters;
 use crate::domain::apply_format::apply_format;
 use crate::domain::apply_search::apply_search;
+use crate::models::filter::LogFilter;
 use crate::models::{filter::Filter, format::Format, log_line::LogLine};
 use crate::stores::analysis_store::AnalysisStore;
 use crate::stores::log_store::LogStore;
@@ -204,16 +205,15 @@ impl LogService {
     }
 
     fn apply_filters(&self, lines: Vec<LogLine>) -> Vec<LogLine> {
-        let filters: Vec<Filter> = self
+        let filters: Vec<LogFilter> = self
             .processing_store
             .get_filters()
             .into_iter()
             .filter(|(enabled, _)| *enabled)
-            .map(|(_, filter)| filter)
+            .map(|(_, filter)| filter.into())
             .collect();
 
         let mut filtered_lines: Vec<LogLine> = Vec::with_capacity(lines.len());
-
         for line in lines {
             if let Some(filtered_line) = apply_filters(&filters, line) {
                 filtered_lines.push(filtered_line);
