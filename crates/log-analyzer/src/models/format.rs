@@ -17,7 +17,7 @@ impl Format {
             return Err(anyhow!("Error when creating new format.\nPlease review alias and regex are not empty"));
         }
 
-        let re = Regex::new(&regex);
+        let re = Regex::new(regex);
         match re {
             Ok(_) => Ok(Format{alias: alias.clone(), regex : regex.clone()}),
             Err(_) => Err(anyhow!("Could not compile regex.\nPlease review regex syntax"))

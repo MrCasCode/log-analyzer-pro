@@ -9,10 +9,9 @@ use tui::{
 };
 
 use crate::{
-    app::{Module, INDEX_SEARCH},
+    app::{Module, INDEX_SEARCH, App},
     data::lazy_stateful_table::LazyStatefulTable,
-    styles::{SELECTED_COLOR, SELECTED_STYLE},
-    App,
+    styles::{SELECTED_COLOR, SELECTED_STYLE}
 };
 
 use super::ui_shared::display_cursor;

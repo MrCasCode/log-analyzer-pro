@@ -34,6 +34,11 @@ impl InMemmoryAnalysisStore {
     }
 }
 
+impl Default for InMemmoryAnalysisStore {
+     fn default() -> Self {
+         Self::new()
+     }
+ }
 
 
 impl AnalysisStore for InMemmoryAnalysisStore {
@@ -131,14 +136,6 @@ impl InMemmoryAnalysisStore {
         let index = InMemmoryAnalysisStore::find_sorted_index(&lines, &line);
         (lines, from, index)
     }
-
-    fn append_sorted_chunk(v: &mut Vec<LogLine>, new_data: &[LogLine]) {
-        if let Some(first) = new_data.first() {
-            let index = InMemmoryAnalysisStore::find_sorted_index(&v, first);
-            let (a, b) = v.split_at(index);
-            *v = [a, new_data, b].concat();
-        }
-    }
 }
 
 
@@ -150,32 +147,5 @@ mod tests {
 
     fn log_line_with_index(index: usize) -> LogLine {
         LogLine { index: index.to_string(), date: "".to_string(), timestamp: "".to_string(), app: "".to_string(), severity: "".to_string(), function: "".to_string(), payload: "".to_string(), color: None }
-    }
-
-    #[test]
-    fn test_append_sorted_chunk_at_end() {
-        let mut current_lines: Vec<LogLine> = (0..100).into_iter().map(|index: usize| log_line_with_index(index)).collect();
-        let new_lines: Vec<LogLine> = (100..200).into_iter().map(|index: usize| log_line_with_index(index)).collect();
-
-        InMemmoryAnalysisStore::append_sorted_chunk(&mut current_lines, &new_lines);
-
-        assert!(current_lines[100].index == "100")
-    }
-
-
-    #[test]
-    fn test_append_sorted_chunk_at_mid() {
-        let mut current_lines: Vec<LogLine> = (0..80).into_iter().map(|index: usize| log_line_with_index(index)).collect();
-
-        let mut new_lines: Vec<LogLine> = (200..300).into_iter().map(|index: usize| log_line_with_index(index)).collect();
-        InMemmoryAnalysisStore::append_sorted_chunk(&mut current_lines, &new_lines);
-
-        new_lines = (100..200).into_iter().map(|index: usize| log_line_with_index(index)).collect();
-        InMemmoryAnalysisStore::append_sorted_chunk(&mut current_lines, &new_lines);
-
-        new_lines = (80..100).into_iter().map(|index: usize| log_line_with_index(index)).collect();
-        InMemmoryAnalysisStore::append_sorted_chunk(&mut current_lines, &new_lines);
-
-        assert!(current_lines[100].index == "100")
     }
 }

@@ -31,6 +31,12 @@ impl InMemmoryProcessingStore {
     }
 }
 
+impl Default for InMemmoryProcessingStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProcessingStore for InMemmoryProcessingStore {
     fn add_format(&self, id: String, format: String) {
         let mut w = self.formats.write();
@@ -39,10 +45,7 @@ impl ProcessingStore for InMemmoryProcessingStore {
 
     fn get_format(&self, id: &String) -> Option<String> {
         let r = self.formats.read();
-        match r.get(id) {
-            Some(format) => Some(format.clone()),
-            _ => None,
-        }
+        r.get(id).cloned()
     }
 
     fn get_formats(&self) -> Vec<Format> {
@@ -66,11 +69,16 @@ impl ProcessingStore for InMemmoryProcessingStore {
 
         let filters = r
             .iter()
-            .map(|(id, (action, filter, enabled))| (*enabled, Filter {
-                alias: id.clone(),
-                action: action.clone(),
-                filter: filter.clone(),
-            }))
+            .map(|(id, (action, filter, enabled))| {
+                (
+                    *enabled,
+                    Filter {
+                        alias: id.clone(),
+                        action: action.clone(),
+                        filter: filter.clone(),
+                    },
+                )
+            })
             .collect();
 
         filters

@@ -30,9 +30,9 @@ impl TryFrom<usize> for SourceType {
     }
 }
 
-impl Into<usize> for SourceType {
-    fn into(self) -> usize {
-        match self {
+impl From<SourceType> for usize {
+    fn from(val: SourceType) -> Self {
+        match val {
             SourceType::FILE => 0,
             SourceType::WS => 1,
         }
@@ -40,10 +40,7 @@ impl Into<usize> for SourceType {
 }
 
 async fn is_file_path_valid(path: &String) -> bool {
-    match File::open(&path).await {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    File::open(&path).await.is_ok()
 }
 
 pub async fn create_source(
@@ -123,7 +120,7 @@ impl LogSource for WsSource {
                     match lines_from_server.next().await {
                         Some(line) => {
                             let line = line?;
-                            println!("{}", line);
+                            sender.send((self.address.clone(), vec![line]))?;
                         }
                         None => break,
                     }

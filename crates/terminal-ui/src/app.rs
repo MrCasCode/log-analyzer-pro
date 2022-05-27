@@ -57,19 +57,20 @@ impl Processing {
     fn set_focus(&mut self, focus: Option<LogLine>) {
         self.focus_on = match focus {
             Some(focus) => focus,
-            None => {
-                let mut default_line = LogLine::default();
-                default_line.index = "0".to_string();
-                default_line
-            }
+            None => LogLine {
+                index: "0".to_string(),
+                ..Default::default()
+            },
         }
     }
 }
 
 impl Default for Processing {
     fn default() -> Self {
-        let mut default_line = LogLine::default();
-        default_line.index = "0".to_string();
+        let default_line = LogLine {
+            index: "0".to_string(),
+            ..Default::default()
+        };
 
         Self {
             is_processing: false,
@@ -362,7 +363,6 @@ impl App {
         // Handle exit filtering
         if self.processing.is_processing && events.iter().any(|e| {
             matches!(e, LogEvent::FilterFinished)
-                || matches!(e, LogEvent::NewLines(start, end) if *start <= self.processing.focus_on.index.parse::<usize>().unwrap() && *end >= self.processing.focus_on.index.parse::<usize>().unwrap())
         }) {
             self.log_lines.navigate_to(self.processing.focus_on.clone());
             self.search_lines.navigate_to(self.processing.focus_on.clone());
@@ -484,7 +484,7 @@ impl App {
             KeyCode::Enter => {
                 if let Some(index) = self.filters.state.selected() {
                     let (_, alias) = &self.filters.items[index];
-                    self.log_analyzer.toggle_filter(alias);
+                    self.log_analyzer.toggle_filter(alias).await;
                 }
                 self.update_filters().await;
             }
@@ -691,14 +691,17 @@ impl App {
 
                         match self.selected_module {
                             Module::Logs => {
-                                let mut element = LogLine::default();
-                                element.index = index.to_string();
+                                let element = LogLine {
+                                    index: index.to_string(),
+                                    ..Default::default()
+                                };
                                 self.log_lines.navigate_to(element);
                             }
                             Module::SearchResult => {
-                                let mut element = LogLine::default();
-                                element.index = index.to_string();
-
+                                let element = LogLine {
+                                    index: index.to_string(),
+                                    ..Default::default()
+                                };
                                 self.search_lines.navigate_to(element);
                             }
                             _ => {}

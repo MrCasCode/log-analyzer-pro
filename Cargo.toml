@@ -1,0 +1,43 @@
+[package]
+name = "lap"
+version = "0.1.0"  #:version
+authors = ["Mario Casals <mario.casals.hernandez@gmail.com>"]
+description = """
+"""
+#documentation = "https://github.com/BurntSushi/ripgrep"
+#homepage = "https://github.com/BurntSushi/ripgrep"
+#repository = "https://github.com/BurntSushi/ripgrep"
+#keywords = ["regex", "grep", "egrep", "search", "pattern"]
+categories = ["command-line-utilities", "text-processing"]
+license = "Unlicense OR MIT"
+exclude = ["HomebrewFormula"]
+#build = "build.rs"
+autotests = false
+edition = "2021"
+
+[[bin]]
+bench = false
+path = "crates/terminal-ui/src/main.rs"
+name = "lap"
+
+
+[workspace]
+members = [
+  "crates/terminal-ui",
+  "crates/log-analyzer",
+  "crates/log-source"
+]
+
+[dependencies]
+anyhow = { version = "1.0.53", features = ["backtrace"] }
+async-std = { version = "1.10.0", features = ["unstable"]}
+crossterm = "0.23"
+tui = "0.17.0"
+unicode-width = "0.1.9"
+log-analyzer = { path = 'crates/log-analyzer'}
+tui-input = "0.3.0"
+flume = "0.10.12"
+tokio = {version = "1.18.2", features = ["sync"]}
+
+[profile.release]
+debug = true

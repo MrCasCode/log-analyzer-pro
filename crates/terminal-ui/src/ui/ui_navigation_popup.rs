@@ -5,7 +5,6 @@ use crate::{
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::Style,
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };

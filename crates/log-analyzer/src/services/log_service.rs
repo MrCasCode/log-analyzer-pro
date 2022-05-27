@@ -1,10 +1,12 @@
 use std::ops::Range;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
-use flume::{Sender};
-use tokio::sync::broadcast;
+use flume::Sender;
+use log_source::source::log_source::{create_source, SourceType};
 use regex::Regex;
+use tokio::sync::broadcast;
 
 use pariter::{scope, IteratorExt as _};
 
@@ -16,51 +18,77 @@ use crate::stores::analysis_store::AnalysisStore;
 use crate::stores::log_store::LogStore;
 use crate::stores::processing_store::ProcessingStore;
 
-use super::log_source::{create_source, SourceType};
-
 use async_trait::async_trait;
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
+    // Currently processing lines (from, to)
     Processing(usize, usize),
+    // New lines processed (from, to)
     NewLines(usize, usize),
+    // New search lines processed (from, to)
     NewSearchLines(usize, usize),
+    // Currently busy filtering
     Filtering,
+    // Finished filtering
     FilterFinished,
+    // Finished busy searching
     Searching,
+    // Finished search
     SearchFinished,
 }
 
 #[async_trait]
 pub trait LogAnalyzer {
+    /// Add a new log source to the analysis
     async fn add_log(
         &self,
         source_type: usize,
         source_address: &String,
         format: Option<&String>,
     ) -> Result<()>;
+    /// Add a new format to the list of available formats
     fn add_format(&self, alias: &String, regex: &String) -> Result<()>;
+    /// Start a new search
     fn add_search(&self, regex: &String);
+    /// Add a new filter to the list of available filters
     fn add_filter(&self, filter: Filter);
+    /// Get log lines between the range [from, to]
     fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
+    /// Get search lines between the range [from, to]
     fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
+    /// Get a list of log lines of `elements` size centered on the `line` element or the closest
+    /// Returns (elements, offset, index)
     fn get_log_lines_containing(
         &self,
         line: LogLine,
         elements: usize,
     ) -> (Vec<LogLine>, usize, usize);
+
+    /// Get a list of log lines of `elements` size centered on the `line` element or the closest
+    /// Returns (elements, offset, index)
     fn get_search_lines_containing(
         &self,
         line: LogLine,
         elements: usize,
     ) -> (Vec<LogLine>, usize, usize);
+
+    /// Get the current managed logs
+    /// Returns a vector of (enabled, log_path, Option<format>)
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)>;
+
+    /// Get all the available formats
     fn get_formats(&self) -> Vec<Format>;
+    /// Get all the available filters together with their enabled state
     fn get_filters(&self) -> Vec<(bool, Filter)>;
+    /// Get how many lines are in the raw logs
     fn get_total_raw_lines(&self) -> usize;
+    /// Get how many lines are in the filtered log
     fn get_total_filtered_lines(&self) -> usize;
+    /// Get how many lines are in the search log
     fn get_total_searched_lines(&self) -> usize;
-    fn toggle_filter(&self, id: &String);
+    /// Enable or disable the given filter
+    async fn toggle_filter(&self, id: &String);
     fn on_event(&self) -> broadcast::Receiver<Event>;
 }
 
@@ -79,7 +107,7 @@ impl LogService {
         analysis_store: Arc<dyn AnalysisStore + Sync + Send>,
     ) -> Arc<Self> {
         let (sender, receiver) = flume::bounded(1_000_000_usize);
-        let (broadcast_sender, _broadcast_receiver) = broadcast::channel(100);
+        let (broadcast_sender, _broadcast_receiver) = broadcast::channel(1_000_000_usize);
 
         let log_service = Arc::new(Self {
             log_store,
@@ -164,15 +192,12 @@ impl LogService {
 
         if let Some(format) = format {
             let format = self.processing_store.get_format(format);
-            format_regex = match format {
-                Some(format) => Some(Regex::new(&format).unwrap()),
-                _ => None,
-            };
+            format_regex = format.map(|format| Regex::new(&format).unwrap());
         }
 
         let mut log_lines: Vec<LogLine> = Vec::with_capacity(line_index.len());
         for (line, index) in line_index {
-            let log_line = apply_format(&format_regex.as_ref(), &line, *index);
+            let log_line = apply_format(&format_regex.as_ref(), line, *index);
             log_lines.push(log_line);
         }
         log_lines
@@ -202,7 +227,7 @@ impl LogService {
         if let Some(search_query) = self.analysis_store.get_search_query() {
             if let Ok(search_regex) = Regex::new(&search_query) {
                 for line in &lines {
-                    if apply_search(&search_regex, &line) {
+                    if apply_search(&search_regex, line) {
                         search_lines.push(line.clone());
                     }
                 }
@@ -227,7 +252,7 @@ impl LogAnalyzer for LogService {
         let source_type = SourceType::try_from(source_type).unwrap();
 
         let log_source = Arc::new(create_source(source_type, source_address.clone()).await?);
-        log_store.add_log(&source_address, log_source.clone(), format, true);
+        log_store.add_log(source_address, log_source.clone(), format, true);
 
         std::thread::Builder::new()
             .name(source_address.clone())
@@ -249,56 +274,51 @@ impl LogAnalyzer for LogService {
     }
 
     fn add_search(&self, regex: &String) {
-        let re = Regex::new(&regex);
+        let re = Regex::new(regex);
         self.analysis_store.reset_search();
-        self.event_channel
-            .send(Event::Searching)
-            .unwrap_or_default();
 
-        match re {
-            Ok(_) => {
-                self.analysis_store.add_search_query(regex);
+        if re.is_ok() {
+            self.analysis_store.add_search_query(regex);
 
-                if let Ok(_) = Regex::new(&regex) {
-                    let analysis_store = self.analysis_store.clone();
-                    let regex_str = regex.clone();
-                    let sender = self.event_channel.clone();
+            let analysis_store = self.analysis_store.clone();
+            let regex_str = regex.clone();
+            let sender = self.event_channel.clone();
 
-                    std::thread::Builder::new()
-                        .name("Search".to_string())
-                        .spawn(move || {
-                            let r_lock = analysis_store.fetch_log();
-                            let log = r_lock.read();
-                            scope(|scope| {
-                                let num_cpus = num_cpus::get();
-                                let chunk_size = log.len() / num_cpus;
-                                let search_lines: Vec<LogLine> = log
-                                    .chunks(chunk_size.max(num_cpus))
-                                    .parallel_map_scoped(scope, move |chunk| {
-                                        let lines = chunk.to_owned();
-                                        let r = Regex::new(&regex_str).unwrap();
-                                        let mut v: Vec<LogLine> = Vec::with_capacity(lines.len());
+            std::thread::Builder::new()
+                .name("Search".to_string())
+                .spawn(move || {
+                    let r_lock = analysis_store.fetch_log();
+                    let log = r_lock.read();
 
-                                        for log_line in lines {
-                                            if apply_search(&r, &log_line) {
-                                                v.push(log_line);
-                                            };
-                                        }
+                    if !log.is_empty() {
+                        sender.send(Event::Searching).unwrap_or_default();
+                        scope(|scope| {
+                            let num_cpus = num_cpus::get();
+                            let chunk_size = log.len() / num_cpus;
+                            let search_lines: Vec<LogLine> = log
+                                .chunks(chunk_size.max(num_cpus))
+                                .parallel_map_scoped(scope, move |chunk| {
+                                    let lines = chunk.to_owned();
+                                    let r = Regex::new(&regex_str).unwrap();
+                                    let mut v: Vec<LogLine> = Vec::with_capacity(lines.len());
 
-                                        v
-                                    })
-                                    .flatten()
-                                    .collect::<Vec<LogLine>>();
-                                analysis_store.add_search_lines(&search_lines);
-                                sender.send(Event::SearchFinished).unwrap_or_default();
-                            })
-                            .unwrap();
+                                    for log_line in lines {
+                                        if apply_search(&r, &log_line) {
+                                            v.push(log_line);
+                                        };
+                                    }
+
+                                    v
+                                })
+                                .flatten()
+                                .collect::<Vec<LogLine>>();
+                            analysis_store.add_search_lines(&search_lines);
                         })
                         .unwrap();
-
-                }
-            }
-            Err(_) => {}
+                        sender.send(Event::SearchFinished).unwrap_or_default();
+                    }
+                })
+                .unwrap();
         }
     }
 
@@ -344,14 +364,12 @@ impl LogAnalyzer for LogService {
         self.processing_store.get_filters()
     }
 
-    fn toggle_filter(&self, id: &String) {
+    async fn toggle_filter(&self, id: &String) {
         self.processing_store.toggle_filter(id);
         self.analysis_store.reset_log();
         self.analysis_store.reset_search();
 
-        self.event_channel
-            .send(Event::Filtering)
-            .unwrap_or_default();
+        let mut receiver = self.event_channel.subscribe();
 
         let enabled_logs: Vec<String> = self
             .log_store
@@ -363,30 +381,32 @@ impl LogAnalyzer for LogService {
 
         let log_store = self.log_store.clone();
         let sender = self.log_sender.clone();
+        let event_sender = self.event_channel.clone();
 
-        let t = std::thread::Builder::new()
+        std::thread::Builder::new()
             .name("Toggle filter".to_string())
             .spawn(move || {
                 for log in enabled_logs {
                     let lines = log_store.extract_lines(&log);
-                    lines.chunks(1_000_000_usize).for_each(|lines| {
-                        match sender.send((log.clone(), lines.to_vec())) {
-                            Ok(_) => {}
-                            Err(_) => {}
-                        };
-                    });
+
+                    if lines.is_empty() {
+                        event_sender.send(Event::FilterFinished).unwrap();
+                        continue;
+                    }
+
+                    event_sender.send(Event::Filtering).unwrap();
+                    sender.send((log.clone(), lines.to_vec())).unwrap();
+
+                    while !matches!(
+                        async_std::task::block_on(receiver.recv()).unwrap_or(Event::Filtering),
+                        Event::NewLines(_, last) if last == (lines.len() - 1)
+                    ) {
+                        std::thread::sleep(Duration::from_millis(100));
+                    }
+                    event_sender.send(Event::FilterFinished).unwrap();
                 }
             })
             .unwrap();
-
-        t.join().unwrap();
-
-        let ev = async_std::task::block_on(self.event_channel.subscribe().recv()).unwrap();
-        if matches!(ev,  Event::NewLines(_, _)) {
-            self.event_channel
-                .send(Event::FilterFinished)
-                .unwrap_or_default();
-        }
     }
 
     fn get_total_raw_lines(&self) -> usize {

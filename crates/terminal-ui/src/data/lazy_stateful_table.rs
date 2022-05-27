@@ -49,7 +49,7 @@ impl<T: Clone> LazyStatefulTable<T> {
         self.items = self.source.source(self.offset, CAPACITY);
 
         self.state.select(match self.state.selected() {
-            Some(i) => Some(i.min(self.items.len() - 1)),
+            Some(i) => Some(i.min(if !self.items.is_empty() {self.items.len() - 1} else {0})),
             _ => None,
         });
     }
@@ -76,7 +76,7 @@ impl<T: Clone> LazyStatefulTable<T> {
 
     pub fn get_selected_item(&self) -> Option<T>{
         match self.state.selected() {
-            Some(i) => self.items.get(i).and_then(|v| Some(v.clone())),
+            Some(i) => self.items.get(i).cloned(),
             None => None
         }
     }

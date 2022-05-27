@@ -1,16 +1,12 @@
-use crate::{
-    app::{App, INDEX_NAVIGATION},
-    styles::SELECTED_STYLE,
-};
+use crate::{app::App, styles::SELECTED_STYLE};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::Style,
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 
-use super::{ui_popup::centered_rect, ui_shared::display_cursor};
+use super::ui_popup::centered_rect;
 
 fn draw_navigation_input<B>(f: &mut Frame<B>, app: &App, area: Rect)
 where

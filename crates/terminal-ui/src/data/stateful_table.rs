@@ -18,7 +18,7 @@ impl<T> StatefulTable<T> {
 
 impl<T> Stateful<T> for StatefulTable<T> {
     fn next(&mut self) -> usize {
-        if self.items.len() > 0 {
+        if !self.items.is_empty() {
             let i = match self.state.selected() {
                 Some(i) => {
                     if i >= self.items.len() - 1 {
@@ -35,7 +35,7 @@ impl<T> Stateful<T> for StatefulTable<T> {
     }
 
     fn previous(&mut self) -> usize {
-        if self.items.len() > 0 {
+        if !self.items.is_empty() {
             let i = match self.state.selected() {
                 Some(i) => {
                     if i == 0 {

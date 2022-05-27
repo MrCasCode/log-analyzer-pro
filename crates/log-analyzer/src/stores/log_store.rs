@@ -1,8 +1,7 @@
+use log_source::source::log_source::LogSource;
 use rustc_hash::FxHashMap as HashMap;
 use parking_lot::RwLock;
 use std::{iter::Iterator, ops::Range, sync::Arc};
-
-use crate::services::log_source::LogSource;
 
 pub trait LogStore {
     fn add_log(
@@ -40,6 +39,12 @@ impl InMemmoryLogStore {
             enabled: RwLock::new(HashMap::default()),
             source: RwLock::new(HashMap::default()),
         }
+    }
+}
+
+impl Default for InMemmoryLogStore {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -111,12 +116,9 @@ impl LogStore for InMemmoryLogStore {
             .iter()
             .map(|(path, enabled)| {
                 (
-                    enabled.clone(),
+                    *enabled,
                     path.clone(),
-                    match format_lock.get(path) {
-                        Some(path) => Some(path.clone()),
-                        _ => None,
-                    },
+                    format_lock.get(path).cloned()
                 )
             })
             .collect();
@@ -125,10 +127,7 @@ impl LogStore for InMemmoryLogStore {
 
     fn get_format(&self, log_id: &String) -> Option<String> {
         let format_lock = self.format.read();
-        match format_lock.get(log_id) {
-            Some(alias) => Some(alias.clone()),
-            _ => None,
-        }
+        format_lock.get(log_id).cloned()
     }
 
     fn get_total_lines(&self) -> usize {

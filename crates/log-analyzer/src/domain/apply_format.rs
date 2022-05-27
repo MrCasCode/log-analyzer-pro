@@ -17,7 +17,7 @@ fn default_log_line(line: &String, index: usize) -> LogLine {
 
 pub fn apply_format(format: &Option<&Regex>, line: &String, index: usize) -> LogLine {
     match format {
-        Some(format) => match format.captures(&line) {
+        Some(format) => match format.captures(line) {
             Some(captures) => {
                 let unwrap_or_empty_string = |capture: &Captures, key: &str| -> String {
                     let str = match capture.name(key) {

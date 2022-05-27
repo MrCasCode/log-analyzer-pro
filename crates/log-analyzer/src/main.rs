@@ -4,10 +4,9 @@ mod services;
 mod stores;
 mod domain;
 
-use models::format::Format;
+use log_source::source::log_source::SourceType;
 
 use services::log_service::{LogAnalyzer, LogService};
-use services::log_source::SourceType;
 use std::sync::Arc;
 use std::time::Duration;
 use stores::analysis_store::InMemmoryAnalysisStore;
@@ -31,12 +30,12 @@ async fn async_main() -> Result<()> {
 
     processing_store.add_format(file.clone(), r"(?P<PAYLOAD>.*)".to_string());
 
-    let mut log_service = LogService::new(log_store, processing_store, analysis_store);
+    let log_service = LogService::new(log_store, processing_store, analysis_store);
     log_service.add_log(
         SourceType::FILE.into(),
         &file,
         None,
-    ).await;
+    ).await?;
 
     loop {
         async_std::task::sleep(Duration::from_secs(10)).await;

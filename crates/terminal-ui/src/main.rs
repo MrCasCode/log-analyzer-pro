@@ -137,7 +137,7 @@ async fn run_app<B: Backend>(
                         // Handle in widget
                         _ => match key.code {
                             KeyCode::Tab => app.navigate(KeyCode::Down),
-                            _ => async_std::task::block_on(app.handle_input(key)),
+                            _ => app.handle_input(key).await,
                         },
                     }
                 }
