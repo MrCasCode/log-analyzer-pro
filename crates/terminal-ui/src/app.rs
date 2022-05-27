@@ -518,7 +518,32 @@ impl App {
                 self.input_buffer_index = INDEX_FILTER_NAME;
                 self.selected_module = Module::FilterPopup;
             }
-            // Delete source
+            // Edit filter -> Popup window
+            KeyCode::Char('e') => {
+                self.show_filter_popup = true;
+                self.input_buffer_index = INDEX_FILTER_NAME;
+                self.selected_module = Module::FilterPopup;
+
+                if let Some(i) = self.filters.state.selected(){
+                    let (_, alias) = &self.filters.items[i];
+                    if let Some((_, filter)) = self.log_analyzer.get_filters().into_iter().find(|(_, filter)| filter.alias == *alias) {
+                        self.input_buffers[INDEX_FILTER_NAME] = Input::default().with_value(alias.clone());
+                        self.input_buffers[INDEX_FILTER_TYPE] = Input::default().with_value("".into());
+                        self.input_buffers[INDEX_FILTER_DATETIME] = Input::default().with_value(filter.filter.date);
+                        self.input_buffers[INDEX_FILTER_TIMESTAMP] = Input::default().with_value(filter.filter.timestamp);
+                        self.input_buffers[INDEX_FILTER_APP] = Input::default().with_value(filter.filter.app);
+                        self.input_buffers[INDEX_FILTER_SEVERITY] = Input::default().with_value(filter.filter.severity);
+                        self.input_buffers[INDEX_FILTER_FUNCTION] = Input::default().with_value(filter.filter.function);
+                        self.input_buffers[INDEX_FILTER_PAYLOAD] = Input::default().with_value(filter.filter.payload);
+                        if let Some((r, g, b)) = filter.filter.color {
+                            self.input_buffers[INDEX_FILTER_RED_COLOR] = Input::default().with_value(r.to_string());
+                            self.input_buffers[INDEX_FILTER_GREEN_COLOR] = Input::default().with_value(g.to_string());
+                            self.input_buffers[INDEX_FILTER_BLUE_COLOR] = Input::default().with_value(b.to_string());
+                        }
+                    }
+                }
+            }
+            // Delete filter
             KeyCode::Char('-') | KeyCode::Char('d') | KeyCode::Delete => {}
             // Nothing
             _ => {}
@@ -570,6 +595,7 @@ impl App {
         if key.code == KeyCode::Esc {
             self.show_source_popup = false;
             self.selected_module = Module::Sources;
+            self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
             return;
         }
 
@@ -610,6 +636,7 @@ impl App {
                             self.show_source_popup = false;
                             self.selected_module = Module::Sources;
                             self.update_sources().await;
+                            self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
                         }
                         Err(err) => {
                             self.selected_module = Module::ErrorPopup;
@@ -629,6 +656,7 @@ impl App {
         if key.code == KeyCode::Esc {
             self.show_filter_popup = false;
             self.selected_module = Module::Filters;
+            self.input_buffers[INDEX_FILTER_NAME..INDEX_FILTER_BLUE_COLOR].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
             return;
         }
 
@@ -696,6 +724,7 @@ impl App {
                     self.show_filter_popup = false;
                     self.selected_module = Module::Filters;
                     self.update_filters().await;
+                    self.input_buffers[INDEX_FILTER_NAME..INDEX_FILTER_BLUE_COLOR].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
                 }
             }
             _ => {}
@@ -712,6 +741,7 @@ impl App {
                     Ok(index) => {
                         self.show_navigation_popup = false;
                         self.selected_module = self.popup.calling_module;
+                        self.input_buffers[INDEX_NAVIGATION] = Input::default().with_value("".into());
 
                         match self.selected_module {
                             Module::Logs => {
@@ -741,6 +771,7 @@ impl App {
             KeyCode::Esc => {
                 self.show_navigation_popup = false;
                 self.selected_module = self.popup.calling_module;
+                self.input_buffers[INDEX_NAVIGATION] = Input::default().with_value("".into());
             }
             _ => {
                 input_backend::to_input_request(Event::Key(key))
