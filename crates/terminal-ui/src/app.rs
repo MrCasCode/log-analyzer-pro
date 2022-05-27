@@ -3,6 +3,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use log_analyzer::models::filter::FilterAction;
 use log_analyzer::models::{filter::Filter, log_line::LogLine};
 use log_analyzer::services::log_service::{Event as LogEvent, LogAnalyzer};
+use tui::style::Color;
 
 use std::sync::Arc;
 
@@ -137,6 +138,9 @@ pub struct App {
     /// Api to the backend processor
     pub log_analyzer: Box<Arc<dyn LogAnalyzer>>,
 
+    /// Primary color
+    pub color: Color,
+
     /// Currently selected module. Used to manage inputs and highlight focus
     pub selected_module: Module,
 
@@ -198,7 +202,7 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(log_analyzer: Box<Arc<dyn LogAnalyzer>>) -> App {
+    pub async fn new(log_analyzer: Box<Arc<dyn LogAnalyzer>>, primary_color: Color) -> App {
         let mut formats = vec!["New".to_string()];
         formats.extend(
             log_analyzer
@@ -225,6 +229,7 @@ impl App {
 
         App {
             log_analyzer,
+            color: primary_color,
             selected_module: Module::Sources,
             show_source_popup: false,
             show_filter_popup: false,

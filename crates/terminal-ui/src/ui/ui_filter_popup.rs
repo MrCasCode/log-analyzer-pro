@@ -5,7 +5,7 @@ use crate::{
         INDEX_FILTER_PAYLOAD, INDEX_FILTER_RED_COLOR, INDEX_FILTER_SEVERITY,
         INDEX_FILTER_TIMESTAMP, INDEX_FILTER_TYPE, parse_color,
     },
-    styles::SELECTED_STYLE,
+    styles::selected_style,
 };
 use tui::{
     backend::Backend,
@@ -27,7 +27,7 @@ where
     let input_widget = Paragraph::new(app.input_buffers[index].value())
         .style(match index == app.input_buffer_index {
             false => Style::default(),
-            true => SELECTED_STYLE,
+            true => selected_style(app.color),
         })
         .block(Block::default().borders(Borders::ALL).title(title));
 
@@ -56,9 +56,9 @@ fn draw_filter_type_selector<B>(
         .select(app.filter_type)
         .style(match index == app.input_buffer_index {
             false => Style::default(),
-            true => SELECTED_STYLE,
+            true => selected_style(app.color),
         })
-        .highlight_style(SELECTED_STYLE);
+        .highlight_style(selected_style(app.color));
 
     f.render_widget(source_type_widget, area);
 }
@@ -127,7 +127,7 @@ where
     let ok_button_widget = Paragraph::new("OK")
         .style(match INDEX_FILTER_OK_BUTTON == app.input_buffer_index {
             false => Style::default(),
-            true => SELECTED_STYLE,
+            true => selected_style(app.color),
         })
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
@@ -142,7 +142,7 @@ where
     let block = Block::default()
         .title("Filter")
         .borders(Borders::ALL)
-        .border_style(SELECTED_STYLE);
+        .border_style(selected_style(app.color));
 
     let area = centered_rect(60, 36, f.size());
     f.render_widget(Clear, area); //this clears out the background

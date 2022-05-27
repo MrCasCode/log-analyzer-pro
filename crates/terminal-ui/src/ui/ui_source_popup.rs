@@ -3,7 +3,7 @@ use crate::{
         App, INDEX_SOURCE_FORMAT, INDEX_SOURCE_NEW_FORMAT_ALIAS, INDEX_SOURCE_NEW_FORMAT_REGEX,
         INDEX_SOURCE_OK_BUTTON, INDEX_SOURCE_PATH, INDEX_SOURCE_TYPE,
     },
-    styles::SELECTED_STYLE,
+    styles::selected_style,
 };
 use tui::{
     backend::{Backend},
@@ -30,9 +30,9 @@ where
         .select(app.source_type)
         .style(match INDEX_SOURCE_TYPE == app.input_buffer_index {
             false => Style::default(),
-            true => SELECTED_STYLE,
+            true => selected_style(app.color),
         })
-        .highlight_style(SELECTED_STYLE);
+        .highlight_style(selected_style(app.color));
 
     f.render_widget(source_type_widget, area);
 }
@@ -44,7 +44,7 @@ where
     let source_path_widget = Paragraph::new(app.input_buffers[INDEX_SOURCE_PATH].value())
         .style(match INDEX_SOURCE_PATH == app.input_buffer_index {
             false => Style::default(),
-            true => SELECTED_STYLE,
+            true => selected_style(app.color),
         })
         .block(Block::default().borders(Borders::ALL).title("Path"));
 
@@ -76,10 +76,10 @@ where
                 .title("Format")
                 .border_style(match INDEX_SOURCE_FORMAT == app.input_buffer_index {
                     false => Style::default(),
-                    true => SELECTED_STYLE,
+                    true => selected_style(app.color),
                 }),
         )
-        .highlight_style(SELECTED_STYLE)
+        .highlight_style(selected_style(app.color))
         .highlight_symbol(">> ");
 
     f.render_stateful_widget(formats, area, &mut app.formats.state);
@@ -94,7 +94,7 @@ where
             .style(
                 match INDEX_SOURCE_NEW_FORMAT_ALIAS == app.input_buffer_index {
                     false => Style::default(),
-                    true => SELECTED_STYLE,
+                    true => selected_style(app.color),
                 },
             )
             .block(Block::default().borders(Borders::ALL).title("Alias"));
@@ -114,7 +114,7 @@ where
             .style(
                 match INDEX_SOURCE_NEW_FORMAT_REGEX == app.input_buffer_index {
                     false => Style::default(),
-                    true => SELECTED_STYLE,
+                    true => selected_style(app.color),
                 },
             )
             .block(Block::default().borders(Borders::ALL).title("Regex"));
@@ -132,7 +132,7 @@ where
     let ok_button_widget = Paragraph::new("OK")
         .style(match INDEX_SOURCE_OK_BUTTON == app.input_buffer_index {
             false => Style::default(),
-            true => SELECTED_STYLE,
+            true => selected_style(app.color),
         })
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
@@ -146,7 +146,7 @@ where
     let block = Block::default()
         .title("Add new source")
         .borders(Borders::ALL)
-        .border_style(SELECTED_STYLE);
+        .border_style(selected_style(app.color));
 
     let area = centered_rect(60, 28, f.size());
     f.render_widget(Clear, area); //this clears out the background

@@ -26,7 +26,7 @@ use std::{
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
-    Frame, Terminal,
+    Frame, Terminal, style::Color,
 };
 use ui::{
     ui_error_message::draw_error_popup, ui_filter_popup::draw_filter_popup,
@@ -48,21 +48,28 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
     let analysis_store = Arc::new(InMemmoryAnalysisStore::new());
 
     let log_service = LogService::new(log_store, processing_store, analysis_store);
-
+    let mut color = Color::LightBlue;
     if let Ok(file) = fs::read_to_string("settings.json") {
         if let Ok(settings) = Settings::from_json(&file) {
-            for format in settings.formats {
-                log_service.add_format(&format.alias, &format.regex)?;
+            if let Some(formats) = settings.formats {
+                for format in formats {
+                    log_service.add_format(&format.alias, &format.regex)?;
+                }
             }
-            for _filter in settings.filters {
-                //processing_store.add_filter(filter.alias, filter.filter, filter.action, false);
+            if let Some(filters) = settings.filters {
+                for filter in filters {
+                    log_service.add_filter(filter);
+                }
+            }
+            if let Some(primary_color) = settings.primary_color {
+                color = Color::Rgb(primary_color.get("red").cloned().unwrap_or_default() , primary_color.get("green").cloned().unwrap_or_default(), primary_color.get("blue").cloned().unwrap_or_default())
             }
         }
     }
 
     // create app and run it
     let tick_rate = Duration::from_millis(100);
-    let app = App::new(Box::new(log_service)).await;
+    let app = App::new(Box::new(log_service), color).await;
     let res = run_app(&mut terminal, app, tick_rate).await;
 
     // restore terminal

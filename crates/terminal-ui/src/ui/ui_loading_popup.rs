@@ -1,4 +1,4 @@
-use crate::{app::App, styles::SELECTED_STYLE};
+use crate::{app::App, styles::selected_style};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -13,7 +13,7 @@ where
     B: Backend,
 {
     let format_regex_widget = Paragraph::new("...")
-        .style(SELECTED_STYLE)
+        .style(selected_style(app.color))
         .block(Block::default().borders(Borders::ALL).title("Loading"));
 
     f.render_widget(format_regex_widget, area);
@@ -25,7 +25,7 @@ where
 {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(SELECTED_STYLE);
+        .border_style(selected_style(app.color));
 
     let area = centered_rect(60, 7, f.size());
     f.render_widget(Clear, area); //this clears out the background

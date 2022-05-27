@@ -1,6 +1,6 @@
 use tui::{widgets::{Paragraph, Block, Borders, Clear}, layout::{Alignment, Rect, Layout, Direction, Constraint}, backend::Backend, Frame};
 
-use crate::{styles::{SELECTED_STYLE, ERROR_STYLE}, app::App};
+use crate::{styles::{selected_style, ERROR_STYLE}, app::App};
 
 use super::ui_popup::centered_rect;
 
@@ -15,12 +15,12 @@ where
     f.render_widget(ok_button_widget, area);
 }
 
-fn draw_ok_button<B>(f: &mut Frame<B>, area: Rect)
+fn draw_ok_button<B>(f: &mut Frame<B>, app: &App, area: Rect)
 where
     B: Backend,
 {
     let ok_button_widget = Paragraph::new("OK")
-        .style(SELECTED_STYLE)
+        .style(selected_style(app.color))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(ok_button_widget, area);
@@ -57,5 +57,5 @@ where
         .split(popup_layout[0]);
 
         draw_error_message(f, app, popup_layout[0]);
-        draw_ok_button(f, popup_layout[1]);
+        draw_ok_button(f, app, popup_layout[1]);
 }

@@ -1,6 +1,6 @@
 use crate::{
     app::{App, INDEX_NAVIGATION},
-    styles::SELECTED_STYLE,
+    styles::selected_style,
 };
 use tui::{
     backend::Backend,
@@ -16,7 +16,7 @@ where
     B: Backend,
 {
     let format_regex_widget = Paragraph::new(app.input_buffers[INDEX_NAVIGATION].value())
-        .style(SELECTED_STYLE)
+        .style(selected_style(app.color))
         .block(Block::default().borders(Borders::ALL).title("Index"));
 
     f.render_widget(format_regex_widget, area);
@@ -32,7 +32,7 @@ where
     let block = Block::default()
         .title("Navigate to index")
         .borders(Borders::ALL)
-        .border_style(SELECTED_STYLE);
+        .border_style(selected_style(app.color));
 
     let area = centered_rect(60, 7, f.size());
     f.render_widget(Clear, area); //this clears out the background

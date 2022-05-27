@@ -11,7 +11,7 @@ use tui::{
 use crate::{
     app::{Module, INDEX_SEARCH, App},
     data::lazy_stateful_table::LazyStatefulTable,
-    styles::{SELECTED_COLOR, SELECTED_STYLE}
+    styles::{selected_style}
 };
 
 use super::ui_shared::display_cursor;
@@ -24,13 +24,13 @@ where
         .title("Sources")
         .borders(Borders::ALL)
         .border_style(match app.selected_module {
-            Module::Sources => SELECTED_STYLE,
+            Module::Sources => selected_style(app.color),
             _ => Style::default(),
         });
 
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default()
-        .bg(SELECTED_COLOR)
+        .bg(app.color)
         .add_modifier(Modifier::BOLD);
 
     let header_cells = ["Enabled", "Log", "Format"]
@@ -39,7 +39,7 @@ where
     let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
     let rows = app.sources.items.iter().map(|item| {
         let get_enabled_widget = |enabled: bool| match enabled {
-            true => Span::styled("V", Style::default().fg(SELECTED_COLOR)),
+            true => Span::styled("V", Style::default().fg(app.color)),
             false => Span::styled("X", Style::default().fg(Color::Gray)),
         };
 
@@ -75,12 +75,12 @@ where
         .title("Filters")
         .borders(Borders::ALL)
         .border_style(match app.selected_module {
-            Module::Filters => SELECTED_STYLE,
+            Module::Filters => selected_style(app.color),
             _ => Style::default(),
         });
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default()
-        .bg(SELECTED_COLOR)
+        .bg(app.color)
         .add_modifier(Modifier::BOLD);
 
     let header_cells = ["Enabled", "Filter"]
@@ -90,7 +90,7 @@ where
 
     let rows = app.filters.items.iter().map(|item| {
         let get_enabled_widget = |enabled: bool| match enabled {
-            true => Span::styled("V", Style::default().fg(SELECTED_COLOR)),
+            true => Span::styled("V", Style::default().fg(app.color)),
             false => Span::styled("X", Style::default().fg(Color::Gray)),
         };
 
@@ -129,6 +129,7 @@ where
 
 fn draw_log<B>(
     f: &mut Frame<B>,
+    color: Color,
     is_selected: bool,
     items: &mut LazyStatefulTable<LogLine>,
     log_columns: &[(String, bool)],
@@ -142,13 +143,13 @@ fn draw_log<B>(
         .title(title)
         .borders(Borders::ALL)
         .border_style(match is_selected {
-            true => SELECTED_STYLE,
+            true => selected_style(color),
             _ => Style::default(),
         });
 
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default()
-        .bg(SELECTED_COLOR)
+        .bg(color)
         .add_modifier(Modifier::BOLD);
 
     let enabled_columns: Vec<&(String, bool)> =
@@ -197,7 +198,7 @@ where
 {
     let input_widget = Paragraph::new(app.input_buffers[index].value())
         .style(match app.selected_module {
-            Module::Search => SELECTED_STYLE,
+            Module::Search => selected_style(app.color),
             _ => Style::default(),
         })
         .block(Block::default().borders(Borders::ALL).title(title));
@@ -226,7 +227,7 @@ where
         .style(
             match app.auto_scroll {
                 false => Style::default().add_modifier(Modifier::DIM),
-                true => SELECTED_STYLE,
+                true => selected_style(app.color),
             }
             ,
         )
@@ -240,7 +241,7 @@ where
     let label = format!(" {}/{}", filtered, total);
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL))
-        .gauge_style(Style::default().fg(SELECTED_COLOR))
+        .gauge_style(Style::default().fg(app.color))
         .percent((if total > 0 { filtered * 100 / total } else { 0 }) as u16)
         .label(label);
     f.render_widget(gauge, bottom_bar_layout[1]);
@@ -249,7 +250,7 @@ where
     let label = format!(" {}/{}", searched, total);
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL))
-        .gauge_style(Style::default().fg(SELECTED_COLOR))
+        .gauge_style(Style::default().fg(app.color))
         .percent((if total > 0 { searched * 100 / total } else { 0 }) as u16)
         .label(label);
 
@@ -278,6 +279,7 @@ where
 
     draw_log(
         f,
+        app.color,
         app.selected_module == Module::Logs,
         &mut app.log_lines,
         &app.log_columns,
@@ -288,6 +290,7 @@ where
     draw_search_box(f, app, main_modules[1], INDEX_SEARCH, "Search");
     draw_log(
         f,
+        app.color,
         app.selected_module == Module::SearchResult,
         &mut app.search_lines,
         &app.log_columns,
