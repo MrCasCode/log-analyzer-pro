@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 
-use super::{format::Format, filter::Filter};
-
+use super::{filter::Filter, format::Format};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Settings {
     pub formats: Option<Vec<Format>>,
     pub filters: Option<Vec<Filter>>,
-    pub primary_color: Option<HashMap<String, u8>>
+    pub primary_color: Option<(u8, u8, u8)>,
 }
 
 impl Settings {
@@ -19,24 +18,21 @@ impl Settings {
 
         match settings {
             Ok(settings) => Ok(settings),
-            _ => Err(anyhow!("Unable to decode settings from file"))
+            _ => Err(anyhow!("Unable to decode settings from file")),
         }
-
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::models::log_line::LogLine;
+
     use super::*;
 
     #[test]
     fn test_load_settings() {
         let json = r#"{
-            "primary_color": {
-                "red": 0,
-                "green": 200,
-                "blue": 200
-            },
+            "primary_color": [200, 200, 0],
             "formats": [
                 {
                     "alias": "Default",
@@ -64,5 +60,24 @@ mod tests {
 
         let settings: Result<Settings, serde_json::Error> = serde_json::from_str(json);
         assert!(settings.is_ok())
+    }
+
+    #[test]
+    fn test_serialize_settings() {
+        let settings = Settings {
+            formats: None,
+            filters: Some(vec![Filter {
+                alias: "test".into(),
+                action: crate::models::filter::FilterAction::INCLUDE,
+                filter: LogLine {
+                    payload: "test".into(),
+                    color: Some((200, 200, 0)),
+                    ..Default::default()
+                },
+            }]),
+            primary_color: None,
+        };
+        let json = serde_json::to_string(&settings);
+        assert!(json.is_ok());
     }
 }

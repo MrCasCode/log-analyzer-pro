@@ -61,8 +61,8 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
                     log_service.add_filter(filter);
                 }
             }
-            if let Some(primary_color) = settings.primary_color {
-                color = Color::Rgb(primary_color.get("red").cloned().unwrap_or_default() , primary_color.get("green").cloned().unwrap_or_default(), primary_color.get("blue").cloned().unwrap_or_default())
+            if let Some((r, g, b)) = settings.primary_color {
+                color = Color::Rgb(r, g, b)
             }
         }
     }

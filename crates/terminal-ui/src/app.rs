@@ -377,6 +377,7 @@ impl App {
         // Handle enter filtering
         if events.iter().any(|e| matches!(e, LogEvent::Filtering)) {
             self.processing.is_processing = true;
+
             self.processing
                 .set_focus(self.log_lines.get_selected_item());
             self.log_lines.clear();
@@ -934,9 +935,9 @@ impl App {
                 KeyCode::Char('r') => self.auto_scroll = !self.auto_scroll,
                 KeyCode::Enter => {
                     if module == Module::SearchResult {
-                        let current_line = self.search_lines.get_selected_item().unwrap();
-
-                        self.log_lines.navigate_to(current_line);
+                        if let Some(current_line) = self.search_lines.get_selected_item() {
+                            self.log_lines.navigate_to(current_line);
+                        }
                     }
                 }
                 // Nothing

@@ -17,11 +17,11 @@ enum Area {
 }
 
 impl Area {
-    fn current_area(i: usize) -> Area {
+    fn current_area(i: usize, elements: usize) -> Area {
         match i {
-            i if i < (CAPACITY / 2 - ROOM) => Area::Below,
-            i if ((CAPACITY / 2 - ROOM)..=(CAPACITY / 2 + ROOM)).contains(&i) => Area::Inside,
-            i if i > (CAPACITY / 2 + ROOM) => Area::Above,
+            i if i < (elements / 2 - ROOM) => Area::Below,
+            i if ((elements / 2 - ROOM)..=(elements / 2 + ROOM)).contains(&i) => Area::Inside,
+            i if i > (elements / 2 + ROOM) => Area::Above,
             _ => Area::Below,
         }
     }
@@ -104,7 +104,7 @@ impl<T: Clone> Stateful<T> for LazyStatefulTable<T> {
         }
         if !self.items.is_empty() {
             let i = match self.state.selected() {
-                Some(i) => match Area::current_area(i) {
+                Some(i) => match Area::current_area(i, self.items.len()) {
                     Area::Below | Area::Inside => {
                         if (i + 1) < self.items.len() {
                             i + 1
@@ -113,21 +113,22 @@ impl<T: Clone> Stateful<T> for LazyStatefulTable<T> {
                         }
                     }
                     Area::Above => {
-                        let last_element = CAPACITY + self.offset;
+                        let len = self.items.len();
+                        let last_element = len + self.offset;
 
                         let new_data = self.source.source(last_element, last_element + ROOM);
 
                         let received_elements = new_data.len();
                         self.items.rotate_left(received_elements);
 
-                        self.items[(CAPACITY - received_elements)..CAPACITY]
+                        self.items[(len - received_elements)..len]
                             .iter_mut()
                             .zip(new_data)
                             .for_each(|(current, new_data)| *current = new_data);
                         self.offset += received_elements;
 
                         self.state.select(None);
-                        i - received_elements + if (i + 1) < self.items.len() { 1 } else { 0 }
+                        i - received_elements + if (i + 1) < len { 1 } else { 0 }
                     }
                 },
 
@@ -145,7 +146,7 @@ impl<T: Clone> Stateful<T> for LazyStatefulTable<T> {
         }
         if !self.items.is_empty() {
             let i = match self.state.selected() {
-                Some(i) => match Area::current_area(i) {
+                Some(i) => match Area::current_area(i, self.items.len()) {
                     Area::Above | Area::Inside => {
                         if i > 0 {
                             i - 1
