@@ -3,7 +3,11 @@ use rustc_hash::FxHashMap as HashMap;
 use parking_lot::RwLock;
 use std::{iter::Iterator, ops::Range, sync::Arc};
 
+/// Store holding raw information
+///
+/// Manages raw lines and associated format
 pub trait LogStore {
+    /// Add a new log to the store
     fn add_log(
         &self,
         log_id: &String,
@@ -11,12 +15,19 @@ pub trait LogStore {
         format: Option<&String>,
         enabled: bool,
     );
+    /// Add a single line to the given log id
     fn add_line(&self, log_id: &String, line: &String);
+    /// Add a many lines to the given log id
     fn add_lines(&self, log_id: &String, lines: &Vec<String>) -> Range<usize>;
+    /// Get the format associated to the given log id
     fn get_format(&self, log_id: &String) -> Option<String>;
+    /// Get a list of (enabled, log_id, format(if any))
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)>;
+    /// Get a list of all the lines for the requested log. WARNING: clones
     fn get_lines(&self, log_id: &String) -> Vec<String>;
+    /// Get a list of all the lines for the requested log. WARNING: moves
     fn extract_lines(&self, log_id: &String) -> Vec<String>;
+    /// Get the count of all the lines
     fn get_total_lines(&self) -> usize;
 }
 

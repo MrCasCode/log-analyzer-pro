@@ -2,20 +2,18 @@ use regex::{Captures, Regex};
 
 use crate::models::log_line::LogLine;
 
-fn default_log_line(line: &String, index: usize) -> LogLine {
+/// Creates a default log line assigning the line content to payload and the index
+fn default_log_line(line: &str, index: usize) -> LogLine {
     LogLine {
         index: index.to_string(),
-        date: "".to_string(),
-        timestamp: "".to_string(),
-        app: "".to_string(),
-        severity: "".to_string(),
-        function: "".to_string(),
-        payload: line.clone(),
+        payload: line.to_string(),
         color: None,
+        ..Default::default()
     }
 }
 
-pub fn apply_format(format: &Option<&Regex>, line: &String, index: usize) -> LogLine {
+/// Apply the given format (if any) to the given line
+pub fn apply_format(format: &Option<&Regex>, line: &str, index: usize) -> LogLine {
     match format {
         Some(format) => match format.captures(line) {
             Some(captures) => {
@@ -42,5 +40,38 @@ pub fn apply_format(format: &Option<&Regex>, line: &String, index: usize) -> Log
             _ => default_log_line(line, index),
         },
         _ => default_log_line(line, index),
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assign_content_to_payload_if_no_format() {
+        let line = "Test";
+        let log_line = apply_format(&None, line, 0);
+        assert_eq!(line, log_line.payload)
+    }
+
+    #[test]
+    fn assign_content_to_payload_if_no_matches() {
+        let line = "Test";
+        let log_line = apply_format(&Some(&Regex::new("\\d").unwrap()), line, 0);
+        assert_eq!(line, log_line.payload)
+    }
+
+    #[test]
+    fn test_format() {
+        let line = "2022-05-27 [1234] test INFO assign_content_to_payload_if_no_matches testing if formatting works";
+        let re = Regex::new("(?P<DATE>[\\d]{4}-[\\d]{2}-[\\d]{2}) \\[(?P<TIMESTAMP>[\\d]{4})\\] (?P<APP>[\\w]*) (?P<SEVERITY>[\\w]*) (?P<FUNCTION>[\\w_]*) (?P<PAYLOAD>.*)").unwrap();
+        let log_line = apply_format(&Some(&re), line, 0);
+        assert_eq!("2022-05-27", log_line.date);
+        assert_eq!("1234", log_line.timestamp);
+        assert_eq!("test", log_line.app);
+        assert_eq!("INFO", log_line.severity);
+        assert_eq!("assign_content_to_payload_if_no_matches", log_line.function);
+        assert_eq!("testing if formatting works", log_line.payload);
     }
 }

@@ -1,10 +1,10 @@
-use regex::Regex;
-
 use crate::models::{
-    filter::{Filter, FilterAction, LogFilter},
+    filter::{FilterAction, LogFilter},
     log_line::LogLine,
 };
 
+/// Applies the given filter to a line deciding if the filtering requirements are satisfied
+/// and applying the filter color if needed
 fn filter_line<'a>(filtering: &'a LogFilter, log_line: &'a mut LogLine) -> bool {
     let mut is_match = false;
     for (key, re) in &filtering.filters {
@@ -21,6 +21,14 @@ fn filter_line<'a>(filtering: &'a LogFilter, log_line: &'a mut LogLine) -> bool 
     is_match
 }
 
+/// Apply a list of filters to a line
+///
+/// Filters are clasified in INCLUDE, EXCLUDE or just MARK
+/// and the filtering process follows that priority.
+///
+/// * If a line is to be included -> It is included
+/// * If a line is to be excluded (and it's not previously included) -> It is excluded
+/// * Marker filters are applied after to determine the final color
 pub fn apply_filters(filters: &[LogFilter], mut log_line: LogLine) -> Option<LogLine> {
     let include_filters = filters
         .iter()
@@ -65,6 +73,8 @@ pub fn apply_filters(filters: &[LogFilter], mut log_line: LogLine) -> Option<Log
 
 #[cfg(test)]
 mod tests {
+    use crate::models::filter::Filter;
+
     use super::*;
 
     #[test]
@@ -89,14 +99,9 @@ mod tests {
 
         let mut filter = LogFilter::from(Filter {
             filter: LogLine {
-                index: "0".to_string(),
                 date: "2022-01-".to_string(),
-                timestamp: "".to_string(),
-                app: "".to_string(),
-                severity: "".to_string(),
-                function: "".to_string(),
-                payload: "".to_string(),
                 color: Some((255, 0, 0)),
+                ..Default::default()
             },
             ..Default::default()
         });
@@ -104,14 +109,9 @@ mod tests {
 
         filter = LogFilter::from(Filter {
             filter: LogLine {
-                index: "0".to_string(),
-                date: "".to_string(),
                 timestamp: "200".to_string(),
-                app: "".to_string(),
-                severity: "".to_string(),
-                function: "".to_string(),
-                payload: "".to_string(),
                 color: Some((254, 0, 0)),
+                ..Default::default()
             },
             ..Default::default()
         });
@@ -119,14 +119,9 @@ mod tests {
 
         filter = LogFilter::from(Filter {
             filter: LogLine {
-                index: "0".to_string(),
-                date: "".to_string(),
-                timestamp: "".to_string(),
                 app: "python".to_string(),
-                severity: "".to_string(),
-                function: "".to_string(),
-                payload: "".to_string(),
                 color: Some((253, 0, 0)),
+                ..Default::default()
             },
             ..Default::default()
         });
@@ -134,14 +129,9 @@ mod tests {
 
         filter = LogFilter::from(Filter {
             filter: LogLine {
-                index: "0".to_string(),
-                date: "".to_string(),
-                timestamp: "".to_string(),
-                app: "".to_string(),
                 severity: "INFO".to_string(),
-                function: "".to_string(),
-                payload: "".to_string(),
                 color: Some((252, 0, 0)),
+                ..Default::default()
             },
             ..Default::default()
         });
@@ -149,14 +139,9 @@ mod tests {
 
         filter = LogFilter::from(Filter {
             filter: LogLine {
-                index: "0".to_string(),
-                date: "".to_string(),
-                timestamp: "".to_string(),
-                app: "".to_string(),
-                severity: "".to_string(),
                 function: "call".to_string(),
-                payload: "".to_string(),
                 color: Some((251, 0, 0)),
+                ..Default::default()
             },
             ..Default::default()
         });
@@ -165,13 +150,9 @@ mod tests {
         filter = LogFilter::from(Filter {
             filter: LogLine {
                 index: "0".to_string(),
-                date: "".to_string(),
-                timestamp: "".to_string(),
-                app: "".to_string(),
-                severity: "".to_string(),
-                function: "".to_string(),
                 payload: "some use".to_string(),
                 color: Some((250, 0, 0)),
+                ..Default::default()
             },
             ..Default::default()
         });
@@ -192,14 +173,10 @@ mod tests {
         };
         let filter = LogFilter::from(Filter {
             filter: LogLine {
-                index: "0".to_string(),
                 date: "2022-01-".to_string(),
                 timestamp: "100".to_string(),
-                app: "".to_string(),
-                severity: "".to_string(),
-                function: "".to_string(),
-                payload: "".to_string(),
                 color: Some((255, 0, 0)),
+                ..Default::default()
             },
             ..Default::default()
         });

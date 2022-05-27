@@ -1,45 +1,38 @@
 mod app;
+mod data;
 mod styles;
 mod ui;
-mod data;
 
-use app::{
-    App,
-};
+use app::App;
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, Event, KeyCode, KeyModifiers, MouseEventKind,
-    },
+    event::{self, DisableMouseCapture, Event, KeyCode, KeyModifiers, MouseEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log_analyzer::{stores::{log_store::InMemmoryLogStore, processing_store::{InMemmoryProcessingStore}, analysis_store::InMemmoryAnalysisStore}, services::log_service::{LogService, LogAnalyzer}, models::settings::Settings};
+use log_analyzer::{
+    models::settings::Settings,
+    services::log_service::{LogAnalyzer, LogService},
+    stores::{
+        analysis_store::InMemmoryAnalysisStore, log_store::InMemmoryLogStore,
+        processing_store::InMemmoryProcessingStore,
+    },
+};
 
 use std::{
     error::Error,
-    fmt::{Debug},
-    io,
-    time::{Duration, Instant}, sync::Arc,
-    fs
+    fs, io,
+    sync::Arc,
+    time::{Duration, Instant},
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
     Frame, Terminal,
 };
-use ui::{ui_log_analyzer::draw_log_analyzer_view, ui_source_popup::draw_source_popup, ui_filter_popup::draw_filter_popup, ui_error_message::draw_error_popup, ui_navigation_popup::draw_navigation_popup, ui_loading_popup::draw_loading_popup};
-
-
-
-
-#[derive(Debug, PartialEq)]
-pub enum Panel {
-    /// Left panel where sources and filters are located
-    Left,
-    /// Main panel where logs are displayed
-    Main,
-}
-
-
+use ui::{
+    ui_error_message::draw_error_popup, ui_filter_popup::draw_filter_popup,
+    ui_loading_popup::draw_loading_popup, ui_log_analyzer::draw_log_analyzer_view,
+    ui_navigation_popup::draw_navigation_popup, ui_source_popup::draw_source_popup,
+};
 
 async fn async_main() -> Result<(), Box<dyn Error>> {
     // setup terminal
@@ -65,17 +58,12 @@ async fn async_main() -> Result<(), Box<dyn Error>> {
                 //processing_store.add_filter(filter.alias, filter.filter, filter.action, false);
             }
         }
-
     }
-
-
-
 
     // create app and run it
     let tick_rate = Duration::from_millis(100);
     let app = App::new(Box::new(log_service)).await;
     let res = run_app(&mut terminal, app, tick_rate).await;
-
 
     // restore terminal
     disable_raw_mode()?;
@@ -97,9 +85,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
-
-
 
 async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
@@ -166,11 +151,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     if app.show_source_popup {
         draw_source_popup(f, app)
-    }
-    else if app.show_filter_popup {
+    } else if app.show_filter_popup {
         draw_filter_popup(f, app)
-    }
-    else if app.show_navigation_popup {
+    } else if app.show_navigation_popup {
         draw_navigation_popup(f, app)
     }
 

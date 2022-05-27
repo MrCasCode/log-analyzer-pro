@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
+/// This struct contains a formated log with its info clasified
+/// in several fields
 pub struct LogLine {
     pub index: String,
     pub date: String,
@@ -16,6 +18,7 @@ pub struct LogLine {
 }
 
 impl LogLine {
+    /// Returns the available fields
     pub fn columns() -> Vec<String> {
         vec![
             "Index".to_string(),
@@ -25,9 +28,10 @@ impl LogLine {
             "Severity".to_string(),
             "Function".to_string(),
             "Payload".to_string(),
-        ]
-    }
+            ]
+        }
 
+    /// Gets the field value with the `columns` returned key
     pub fn get(&self, key: &str) -> Option<&String> {
         match key {
             "Index" => Some(&self.index),
@@ -41,6 +45,7 @@ impl LogLine {
         }
     }
 
+    /// Gets a (key, value) like representation of some fields
     pub fn values(&self) -> Vec<(&str, &String)> {
         vec![
             ("Date", &self.date),

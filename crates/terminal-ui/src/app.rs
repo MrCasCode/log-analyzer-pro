@@ -133,21 +133,28 @@ impl LazySource<LogLine> for SearchSourcer {
 /// This struct holds the current state of the app. In particular, it has the `items` field which is a wrapper
 /// around `ListState`. Keeping track of the items state let us render the associated widget with its state
 /// and have access to features such as natural scrolling.
-///
-/// Check the event handling at the bottom to see how to change the state on incoming events.
-/// Check the drawing logic for items on how to specify the highlighting style for selected items.
 pub struct App {
+    /// Api to the backend processor
     pub log_analyzer: Box<Arc<dyn LogAnalyzer>>,
 
+    /// Currently selected module. Used to manage inputs and highlight focus
     pub selected_module: Module,
 
+    /// Display the new source popup
     pub show_source_popup: bool,
+    /// Display the new filter popup
     pub show_filter_popup: bool,
+    /// Display an error message
     pub show_error_message: bool,
+    /// Display the navigation popup
     pub show_navigation_popup: bool,
 
+    /// Vector of user input. Entries are uniquely assigned to each UI input, and the selection is
+    /// performed with the `input_buffer_index`
     pub input_buffers: Vec<Input>,
+    /// Currently selected input buffer
     pub input_buffer_index: usize,
+    /// Stateful list of all the current formats to be displayed in the source popup
     pub formats: StatefulList<String>,
 
     /// Tab selector index for Source Type
@@ -162,20 +169,31 @@ pub struct App {
     // Display all filters in the filters panel
     pub filters: StatefulTable<(bool, String)>,
 
+    /// Lazy widget for the main view of the logs
     pub log_lines: LazyStatefulTable<LogLine>,
+    /// Lazy widget for the main view of the search
     pub search_lines: LazyStatefulTable<LogLine>,
+    /// Apply an offset to the logs to simulate horizontal scrolling
     pub horizontal_offset: usize,
 
+    /// Resizing of the side_menu to the main view
     pub side_main_size_percentage: u16,
+    /// Resizing on the side_menu between sources and filters
     pub log_filter_size_percentage: u16,
+    /// Resizing on the main view between logs and searchs
     pub log_search_size_percentage: u16,
 
+    /// Active log columns to display in the log and the search
     pub log_columns: Vec<(String, bool)>,
 
+    /// Auto scroll to the last receive elements. Used for live logs
     pub auto_scroll: bool,
 
+    /// Manage the popup interaction
     pub popup: PopupInteraction,
+    /// Manage the processing popup
     pub processing: Processing,
+    /// Receive state events from the backed to kwow when it's busy or when new elements are available
     event_receiver: tokio::sync::broadcast::Receiver<LogEvent>,
 }
 

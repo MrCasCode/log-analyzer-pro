@@ -22,6 +22,7 @@ use crate::stores::processing_store::ProcessingStore;
 use async_trait::async_trait;
 
 #[derive(Debug, Clone, PartialEq)]
+/// Notify of state changes
 pub enum Event {
     // Currently processing lines (from, to)
     Processing(usize, usize),
@@ -40,6 +41,7 @@ pub enum Event {
 }
 
 #[async_trait]
+/// Main API of this crate
 pub trait LogAnalyzer {
     /// Add a new log source to the analysis
     async fn add_log(
@@ -102,6 +104,13 @@ pub struct LogService {
 }
 
 impl LogService {
+    /// Instantiates the service and starts the consumer thread.
+    ///
+    /// The consumer thread continuously listens to lines from log sources and applies
+    /// a chain of operations
+    /// * apply format
+    /// * apply filters
+    /// * apply search
     pub fn new(
         log_store: Arc<dyn LogStore + Sync + Send>,
         processing_store: Arc<dyn ProcessingStore + Sync + Send>,
@@ -143,6 +152,7 @@ impl LogService {
                             .unwrap_or_default();
 
                         scope(|scope| {
+                            // Split the lines to process in equal chunks to be processed in parallel
                             let processed: Vec<(Vec<LogLine>, Vec<LogLine>)> = elements
                                 .chunks(chunk_size.max(num_cpus))
                                 .parallel_map_scoped(scope, |chunk| {
@@ -153,11 +163,13 @@ impl LogService {
                                 })
                                 .collect();
 
+                            // Store the processed lines in the analysis store
                             for (filtered, search) in processed {
                                 log.analysis_store.add_lines(&filtered);
                                 log.analysis_store.add_search_lines(&search);
                             }
 
+                            // Notify of the processed lines
                             event_sender
                                 .send(Event::NewLines(first_index, last_index))
                                 .unwrap_or_default();
@@ -174,6 +186,7 @@ impl LogService {
         log_service
     }
 
+    /// Store the raw received lines in memory and retrieve if there is a format for this log
     fn process_raw_lines(
         &self,
         path: String,
@@ -184,6 +197,7 @@ impl LogService {
         (format, indexes, lines)
     }
 
+    /// Apply formatting (if any) to a list of lines and return the formated `LogLine`
     fn apply_format(
         &self,
         format: &Option<String>,
@@ -204,6 +218,7 @@ impl LogService {
         log_lines
     }
 
+    /// Apply filters (if any) to a list of `LogLine` and return the filtered list of `LogLine`
     fn apply_filters(&self, lines: Vec<LogLine>) -> Vec<LogLine> {
         let filters: Vec<LogFilter> = self
             .processing_store
@@ -222,6 +237,7 @@ impl LogService {
         filtered_lines
     }
 
+    /// Apply the search query (if any) to a list of `LogLine` and return both the received lines and the searched ones
     fn apply_search(&self, lines: Vec<LogLine>) -> (Vec<LogLine>, Vec<LogLine>) {
         let mut search_lines: Vec<LogLine> = Vec::with_capacity(lines.len());
         if let Some(search_query) = self.analysis_store.get_search_query() {
@@ -366,6 +382,8 @@ impl LogAnalyzer for LogService {
 
     async fn toggle_filter(&self, id: &String) {
         self.processing_store.toggle_filter(id);
+
+        // Reset everything because we need to recompute the log from the raw lines
         self.analysis_store.reset_log();
         self.analysis_store.reset_search();
 

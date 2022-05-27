@@ -16,7 +16,7 @@ impl Settings {
 
         match settings {
             Ok(settings) => Ok(settings),
-            _ => Err(anyhow!("Unable to decode settings from"))
+            _ => Err(anyhow!("Unable to decode settings from file"))
         }
 
     }

@@ -4,6 +4,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
+/// Describe the action of a filter
 pub enum FilterAction {
     /// Just add a color marker
     MARKER,
@@ -31,9 +32,12 @@ impl Default for FilterAction {
 
 
 #[derive(Default, Clone, Debug)]
+/// Struct with cached vector of log_line keys with their associated regex
 pub struct LogFilter {
     pub action: FilterAction,
+    /// List of (log_line_key, regex)
     pub filters: Vec<(String, Regex)>,
+    /// Color - if any
     pub color: Option<(u8, u8, u8)>
 }
 
@@ -46,9 +50,11 @@ impl From<Filter> for LogFilter {
 
 
 #[derive(Default, Serialize, Deserialize, Debug)]
+/// Base filter definition.
 pub struct Filter {
     pub alias: String,
     pub action: FilterAction,
+    /// Contains the regex filtering in the `LogLine` fields
     pub filter: LogLine
 }
 
@@ -78,13 +84,7 @@ mod tests {
             action: FilterAction::MARKER,
             filter: LogLine {
                 index: "0".to_string(),
-                date: "".to_string(),
-                timestamp: "".to_string(),
-                app: "".to_string(),
-                severity: "".to_string(),
-                function: "".to_string(),
-                payload: "".to_string(),
-                color: None,
+                ..Default::default()
             },
         };
         let json = serde_json::to_string(&filter);

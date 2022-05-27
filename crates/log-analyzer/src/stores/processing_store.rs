@@ -7,12 +7,23 @@ use parking_lot::RwLock;
 
 use rustc_hash::FxHashMap as HashMap;
 
+/// Store holding all the processing information. Format and filter definitions
 pub trait ProcessingStore {
+    /// Add a new format to the store
+    /// * `id`: alias
+    /// * `format`: regex formatting
     fn add_format(&self, id: String, format: String);
+    /// Get the format data for the requested format alias
     fn get_format(&self, id: &String) -> Option<String>;
+    /// Get a list of formats
     fn get_formats(&self) -> Vec<Format>;
+    /// Add a new filter to the store
+    /// * `id`: alias
+    /// * `filter`: log line regex definitions
     fn add_filter(&self, id: String, filter: LogLine, action: FilterAction, enabled: bool);
+    /// Get a list of filters together with their enabled state
     fn get_filters(&self) -> Vec<(bool, Filter)>;
+    /// Switch the enabled state for the given filter
     fn toggle_filter(&self, id: &String);
 }
 pub struct InMemmoryProcessingStore {
