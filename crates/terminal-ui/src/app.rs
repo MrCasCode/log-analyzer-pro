@@ -594,7 +594,9 @@ impl App {
         // Add new source -> Popup window
         if key.code == KeyCode::Esc {
             self.show_source_popup = false;
+            self.source_type = 0;
             self.selected_module = Module::Sources;
+            self.formats.state.select(Some(0));
             self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
             return;
         }
@@ -634,6 +636,7 @@ impl App {
                     match self.add_log().await {
                         Ok(_) => {
                             self.show_source_popup = false;
+                            self.source_type = 0;
                             self.selected_module = Module::Sources;
                             self.update_sources().await;
                             self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
@@ -656,6 +659,7 @@ impl App {
         if key.code == KeyCode::Esc {
             self.show_filter_popup = false;
             self.selected_module = Module::Filters;
+            self.filter_type = 0;
             self.input_buffers[INDEX_FILTER_NAME..INDEX_FILTER_BLUE_COLOR].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
             return;
         }
@@ -723,6 +727,7 @@ impl App {
                     self.log_analyzer.add_filter(filter);
                     self.show_filter_popup = false;
                     self.selected_module = Module::Filters;
+                    self.filter_type = 0;
                     self.update_filters().await;
                     self.input_buffers[INDEX_FILTER_NAME..INDEX_FILTER_BLUE_COLOR].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
                 }
