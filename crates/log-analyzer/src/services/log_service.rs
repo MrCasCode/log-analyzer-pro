@@ -19,7 +19,6 @@ use crate::stores::analysis_store::AnalysisStore;
 use crate::stores::log_store::LogStore;
 use crate::stores::processing_store::ProcessingStore;
 
-use async_trait::async_trait;
 
 #[derive(Debug, Clone, PartialEq)]
 /// Notify of state changes
@@ -40,11 +39,10 @@ pub enum Event {
     SearchFinished,
 }
 
-#[async_trait]
 /// Main API of this crate
 pub trait LogAnalyzer {
     /// Add a new log source to the analysis
-    async fn add_log(
+    fn add_log(
         &self,
         source_type: usize,
         source_address: &String,
@@ -91,7 +89,7 @@ pub trait LogAnalyzer {
     /// Get how many lines are in the search log
     fn get_total_searched_lines(&self) -> usize;
     /// Enable or disable the given filter
-    async fn toggle_filter(&self, id: &String);
+    fn toggle_filter(&self, id: &String);
     fn on_event(&self) -> broadcast::Receiver<Event>;
 }
 
@@ -254,9 +252,8 @@ impl LogService {
     }
 }
 
-#[async_trait]
 impl LogAnalyzer for LogService {
-    async fn add_log(
+    fn add_log(
         &self,
         source_type: usize,
         source_address: &String,
@@ -267,7 +264,7 @@ impl LogAnalyzer for LogService {
 
         let source_type = SourceType::try_from(source_type).unwrap();
 
-        let log_source = Arc::new(create_source(source_type, source_address.clone()).await?);
+        let log_source = Arc::new(async_std::task::block_on(create_source(source_type, source_address.clone()))?);
         log_store.add_log(source_address, log_source.clone(), format, true);
 
         std::thread::Builder::new()
@@ -303,8 +300,7 @@ impl LogAnalyzer for LogService {
             std::thread::Builder::new()
                 .name("Search".to_string())
                 .spawn(move || {
-                    let r_lock = analysis_store.fetch_log();
-                    let log = r_lock.read();
+                    let log = analysis_store.fetch_log();
 
                     if !log.is_empty() {
                         sender.send(Event::Searching).unwrap_or_default();
@@ -380,7 +376,7 @@ impl LogAnalyzer for LogService {
         self.processing_store.get_filters()
     }
 
-    async fn toggle_filter(&self, id: &String) {
+    fn toggle_filter(&self, id: &String) {
         self.processing_store.toggle_filter(id);
 
         // Reset everything because we need to recompute the log from the raw lines

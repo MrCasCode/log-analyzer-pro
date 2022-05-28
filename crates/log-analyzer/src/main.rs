@@ -35,7 +35,7 @@ async fn async_main() -> Result<()> {
         SourceType::FILE.into(),
         &file,
         None,
-    ).await?;
+    )?;
 
     loop {
         async_std::task::sleep(Duration::from_secs(10)).await;

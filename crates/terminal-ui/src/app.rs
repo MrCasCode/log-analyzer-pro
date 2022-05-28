@@ -296,8 +296,7 @@ impl App {
 
         let path = self.input_buffers[INDEX_SOURCE_PATH].value().to_string();
         self.log_analyzer
-            .add_log(self.source_type, &path, alias.as_ref())
-            .await?;
+            .add_log(self.source_type, &path, alias.as_ref())?;
 
         Ok(())
     }
@@ -508,7 +507,7 @@ impl App {
             KeyCode::Enter => {
                 if let Some(index) = self.filters.state.selected() {
                     let (_, alias) = &self.filters.items[index];
-                    self.log_analyzer.toggle_filter(alias).await;
+                    self.log_analyzer.toggle_filter(alias);
                 }
                 self.update_filters().await;
             }

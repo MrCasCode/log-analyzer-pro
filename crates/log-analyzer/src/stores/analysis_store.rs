@@ -1,5 +1,5 @@
 use crate::models::log_line::LogLine;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, lock_api::RwLockReadGuard, RawRwLock};
 use std::sync::Arc;
 
 /// Store for managing processed logs.
@@ -19,9 +19,9 @@ pub trait AnalysisStore {
     /// Clear the searched log
     fn reset_search(&self);
     /// Get a RwLock to the current processed log to avoid copying
-    fn fetch_log(&self) -> Arc<RwLock<Vec<LogLine>>>;
+    fn fetch_log(&self) -> RwLockReadGuard<RawRwLock, Vec<LogLine>>;
     /// Get a RwLock to the current searched log to avoid copying
-    fn fetch_search(&self) -> Arc<RwLock<Vec<LogLine>>>;
+    fn fetch_search(&self) -> RwLockReadGuard<RawRwLock, Vec<LogLine>>;
     /// Get a copy of a window of lines. Is safe to query out of bounds
     fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
     /// Get a copy of a window of search lines. Is safe to query out of bounds
@@ -48,17 +48,17 @@ pub trait AnalysisStore {
     fn get_total_searched_lines(&self) -> usize;
 }
 pub struct InMemmoryAnalysisStore {
-    log: Arc<RwLock<Vec<LogLine>>>,
-    search_query: Arc<RwLock<Option<String>>>,
-    search_log: Arc<RwLock<Vec<LogLine>>>,
+    log: RwLock<Vec<LogLine>>,
+    search_query: RwLock<Option<String>>,
+    search_log: RwLock<Vec<LogLine>>,
 }
 
 impl InMemmoryAnalysisStore {
     pub fn new() -> Self {
         Self {
-            log: Arc::new(RwLock::new(Vec::new())),
-            search_query: Arc::new(RwLock::new(None)),
-            search_log: Arc::new(RwLock::new(Vec::new())),
+            log: RwLock::new(Vec::new()),
+            search_query: RwLock::new(None),
+            search_log: RwLock::new(Vec::new()),
         }
     }
 }
@@ -94,12 +94,12 @@ impl AnalysisStore for InMemmoryAnalysisStore {
         r.clone()
     }
 
-    fn fetch_log(&self) -> Arc<RwLock<Vec<LogLine>>> {
-        self.log.clone()
+    fn fetch_log(&self) -> RwLockReadGuard<RawRwLock, Vec<LogLine>> {
+        self.log.read()
     }
 
-    fn fetch_search(&self) -> Arc<RwLock<Vec<LogLine>>> {
-        self.search_log.clone()
+    fn fetch_search(&self) -> RwLockReadGuard<RawRwLock, Vec<LogLine>> {
+        self.search_log.read()
     }
 
     fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine> {
