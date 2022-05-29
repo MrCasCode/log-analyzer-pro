@@ -23,12 +23,16 @@ pub trait LogStore {
     fn get_format(&self, log_id: &String) -> Option<String>;
     /// Get a list of (enabled, log_id, format(if any))
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)>;
+    /// Get the log source associated to the log id
+    fn get_source(&self, id: &String) -> Option<Arc<Box<dyn LogSource + Send + Sync>>>;
     /// Get a list of all the lines for the requested log. WARNING: clones
     fn get_lines(&self, log_id: &String) -> Vec<String>;
     /// Get a list of all the lines for the requested log. WARNING: moves
     fn extract_lines(&self, log_id: &String) -> Vec<String>;
     /// Get the count of all the lines
     fn get_total_lines(&self) -> usize;
+    /// Change the enabled state of the given log
+    fn toggle_log(&self, log_id: &String);
 }
 
 pub struct InMemmoryLogStore {
@@ -143,5 +147,18 @@ impl LogStore for InMemmoryLogStore {
 
     fn get_total_lines(&self) -> usize {
         self.raw_lines.read().values().fold(0, |acc, v| acc + v.len())
+    }
+
+    fn get_source(&self, id: &String) -> Option<Arc<Box<dyn LogSource + Send + Sync>>> {
+        if let Some((_id, source)) = self.source.read().iter().find(|(log_id, source)| *id == **log_id) {
+            return Some(source.clone())
+        }
+        return None
+    }
+
+    fn toggle_log(&self, log_id: &String) {
+        if let Some(e) = self.enabled.write().get_mut(log_id) {
+            *e = !*e;
+        }
     }
 }

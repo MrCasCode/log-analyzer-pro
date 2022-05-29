@@ -1,3 +1,5 @@
+
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
@@ -11,6 +13,7 @@ use async_std::{
 use async_trait::async_trait;
 use flume::Sender;
 use parking_lot::RwLock;
+
 
 #[derive(PartialEq)]
 pub enum SourceType {
@@ -51,7 +54,8 @@ pub async fn create_source(
         SourceType::FILE => match is_file_path_valid(&source_address).await {
             true => Ok(Box::new(FileSource {
                 path: source_address,
-                read_lines: RwLock::new(0)
+                read_lines: RwLock::new(0),
+                enabled: AtomicBool::new(true)
             })),
             false => Err(anyhow!(
                 "Could not open file.\nPlease ensure that path is correct"
@@ -59,6 +63,7 @@ pub async fn create_source(
         },
         SourceType::WS => Ok(Box::new(WsSource {
             address: source_address,
+            enabled: AtomicBool::new(true)
         })),
     }
 }
@@ -66,18 +71,21 @@ pub async fn create_source(
 #[async_trait]
 pub trait LogSource {
     async fn run(&self, sender: Sender<(String, Vec<String>)>) -> Result<()>;
+    fn stop(&self);
+    fn get_address(&self) -> String;
 }
 
 pub struct FileSource {
     path: String,
-    read_lines: RwLock<usize>
+    read_lines: RwLock<usize>,
+    enabled: AtomicBool
 }
 
 #[async_trait]
 impl LogSource for FileSource {
     async fn run(&self, sender: Sender<(String, Vec<String>)>) -> Result<()> {
         let capacity = 1_000_000_usize;
-        loop {
+        while self.enabled.load(Ordering::Relaxed) {
             let file = File::open(&self.path).await;
             match file {
                 Ok(f) => {
@@ -97,25 +105,36 @@ impl LogSource for FileSource {
                 Err(_) => break,
             }
         }
-
+        // restore after quitting
+        self.enabled.store(true, Ordering::Relaxed);
         Ok(())
     }
+
+    fn stop(&self) {
+        self.enabled.store(false, Ordering::Relaxed);
+    }
+
+    fn get_address(&self) -> String {
+        self.path.clone()
+    }
+
 }
 
 pub struct WsSource {
     address: String,
+    enabled: AtomicBool
 }
 
 #[async_trait]
 impl LogSource for WsSource {
     async fn run(&self, sender: Sender<(String, Vec<String>)>) -> Result<()> {
-        loop {
+        while self.enabled.load(Ordering::Relaxed) {
             let stream = match TcpStream::connect(&self.address).await {
                 Ok(stream) => Some(stream),
                 Err(_) => None,
             };
             if let Some(stream) = stream {
-                loop {
+                while self.enabled.load(Ordering::Relaxed) {
                     let mut lines_from_server = BufReader::new(&stream).lines().fuse();
                     match lines_from_server.next().await {
                         Some(line) => {
@@ -128,6 +147,16 @@ impl LogSource for WsSource {
             }
             async_std::task::sleep(Duration::from_secs(3)).await;
         }
+        // restore after quitting
+        self.enabled.store(true, Ordering::Relaxed);
         Ok(())
+    }
+
+    fn stop(&self) {
+        self.enabled.store(false, Ordering::Relaxed);
+    }
+
+    fn get_address(&self) -> String {
+        self.address.clone()
     }
 }

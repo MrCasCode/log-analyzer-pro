@@ -315,8 +315,15 @@ impl App {
     }
 
     pub async fn update_sources(&mut self) {
+        let index = self.sources.state.selected();
         let sources = self.log_analyzer.get_logs();
-        self.sources = StatefulTable::with_items(sources)
+        self.sources = StatefulTable::with_items(sources);
+
+        if index.is_some() &&  self.sources.items.len() >= index.unwrap() {
+            self.sources.state.select(index)
+        }
+
+
     }
 
     pub async fn update_filters(&mut self) {
@@ -461,7 +468,13 @@ impl App {
                 self.sources.next();
             }
             // Toggle enabled/disabled source
-            KeyCode::Enter => {}
+            KeyCode::Enter => {
+                if let Some(i) = self.sources.state.selected() {
+                    let (_, id, _) = &self.sources.items[i];
+                    self.log_analyzer.toggle_source(id);
+                    self.update_sources().await;
+                }
+            }
             // Add new source -> Popup window
             KeyCode::Char('i') | KeyCode::Char('+') | KeyCode::Char('a') => {
                 self.formats.state.select(Some(0));

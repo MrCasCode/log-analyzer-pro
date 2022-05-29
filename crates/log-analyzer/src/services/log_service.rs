@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use flume::Sender;
-use log_source::source::log_source::{create_source, SourceType};
+use log_source::source::log_source::{create_source, LogSource, SourceType};
 use regex::Regex;
 use tokio::sync::broadcast;
 
@@ -18,7 +18,6 @@ use crate::models::{filter::Filter, format::Format, log_line::LogLine};
 use crate::stores::analysis_store::AnalysisStore;
 use crate::stores::log_store::LogStore;
 use crate::stores::processing_store::ProcessingStore;
-
 
 #[derive(Debug, Clone, PartialEq)]
 /// Notify of state changes
@@ -88,6 +87,8 @@ pub trait LogAnalyzer {
     fn get_total_filtered_lines(&self) -> usize;
     /// Get how many lines are in the search log
     fn get_total_searched_lines(&self) -> usize;
+    /// Enable or disable the given source
+    fn toggle_source(&self, id: &String);
     /// Enable or disable the given filter
     fn toggle_filter(&self, id: &String);
     fn on_event(&self) -> broadcast::Receiver<Event>;
@@ -250,6 +251,20 @@ impl LogService {
 
         (lines, search_lines)
     }
+
+    /// Helper function to run log sources
+    fn run_log_source(&self, log_source: Arc<Box<dyn LogSource + Send + Sync>>) {
+        let sender = self.log_sender.clone();
+
+        std::thread::Builder::new()
+            .name(log_source.get_address())
+            .spawn(|| {
+                async_std::task::spawn(async move {
+                    log_source.run(sender).await.unwrap();
+                });
+            })
+            .unwrap();
+    }
 }
 
 impl LogAnalyzer for LogService {
@@ -259,22 +274,16 @@ impl LogAnalyzer for LogService {
         source_address: &String,
         format: Option<&String>,
     ) -> Result<()> {
-        let sender = self.log_sender.clone();
         let log_store = self.log_store.clone();
 
         let source_type = SourceType::try_from(source_type).unwrap();
 
-        let log_source = Arc::new(async_std::task::block_on(create_source(source_type, source_address.clone()))?);
+        let log_source = Arc::new(async_std::task::block_on(create_source(
+            source_type,
+            source_address.clone(),
+        ))?);
         log_store.add_log(source_address, log_source.clone(), format, true);
-
-        std::thread::Builder::new()
-            .name(source_address.clone())
-            .spawn(|| {
-                async_std::task::spawn(async move {
-                    log_source.run(sender).await.unwrap();
-                });
-            })
-            .unwrap();
+        self.run_log_source(log_source);
 
         Ok(())
     }
@@ -376,6 +385,37 @@ impl LogAnalyzer for LogService {
         self.processing_store.get_filters()
     }
 
+    fn get_total_raw_lines(&self) -> usize {
+        self.log_store.get_total_lines()
+    }
+
+    fn get_total_filtered_lines(&self) -> usize {
+        self.analysis_store.get_total_filtered_lines()
+    }
+
+    fn get_total_searched_lines(&self) -> usize {
+        self.analysis_store.get_total_searched_lines()
+    }
+
+    fn toggle_source(&self, id: &String) {
+        if let Some((enabled, _log, _format)) = self
+            .log_store
+            .get_logs()
+            .into_iter()
+            .find(|(_, log_id, _)| log_id == id)
+        {
+            if let Some(source) = self.log_store.get_source(id) {
+                self.log_store.toggle_log(id);
+                // If enabled -> disable
+                if enabled {
+                    source.stop();
+                } else {
+                    self.run_log_source(source);
+                }
+            }
+        }
+    }
+
     fn toggle_filter(&self, id: &String) {
         self.processing_store.toggle_filter(id);
 
@@ -421,18 +461,6 @@ impl LogAnalyzer for LogService {
                 }
             })
             .unwrap();
-    }
-
-    fn get_total_raw_lines(&self) -> usize {
-        self.log_store.get_total_lines()
-    }
-
-    fn get_total_filtered_lines(&self) -> usize {
-        self.analysis_store.get_total_filtered_lines()
-    }
-
-    fn get_total_searched_lines(&self) -> usize {
-        self.analysis_store.get_total_searched_lines()
     }
 
     fn on_event(&self) -> broadcast::Receiver<Event> {
