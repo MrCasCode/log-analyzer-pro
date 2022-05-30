@@ -9,9 +9,9 @@ use tui::{
 };
 
 use crate::{
-    app::{Module, INDEX_SEARCH, App},
+    app::{App, Module, INDEX_SEARCH},
     data::lazy_stateful_table::LazyStatefulTable,
-    styles::{selected_style}
+    styles::selected_style,
 };
 
 use super::ui_shared::display_cursor;
@@ -29,9 +29,7 @@ where
         });
 
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default()
-        .bg(app.color)
-        .add_modifier(Modifier::BOLD);
+    let normal_style = Style::default().bg(app.color).add_modifier(Modifier::BOLD);
 
     let header_cells = ["Enabled", "Log", "Format"]
         .iter()
@@ -79,9 +77,7 @@ where
             _ => Style::default(),
         });
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default()
-        .bg(app.color)
-        .add_modifier(Modifier::BOLD);
+    let normal_style = Style::default().bg(app.color).add_modifier(Modifier::BOLD);
 
     let header_cells = ["Enabled", "Filter"]
         .iter()
@@ -127,45 +123,44 @@ where
     draw_filters(f, app, left_modules[1]);
 }
 
-fn draw_log<B>(
-    f: &mut Frame<B>,
-    color: Color,
-    is_selected: bool,
-    items: &mut LazyStatefulTable<LogLine>,
-    log_columns: &[(String, bool)],
-    title: &str,
-    horizontal_offset: usize,
-    area: Rect,
-) where
+fn draw_log<B>(f: &mut Frame<B>, app: &mut App, module: Module, title: &str, area: Rect)
+where
     B: Backend,
 {
+    let is_selected = app.selected_module == module;
+    let items = if module == Module::Logs {
+        &app.log_lines.items
+    } else {
+        &app.search_lines.items
+    };
     let log_widget = Block::default()
         .title(title)
         .borders(Borders::ALL)
         .border_style(match is_selected {
-            true => selected_style(color),
+            true => selected_style(app.color),
             _ => Style::default(),
         });
 
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default()
-        .bg(color)
-        .add_modifier(Modifier::BOLD);
+    let normal_style = Style::default().bg(app.color).add_modifier(Modifier::BOLD);
 
-    let enabled_columns: Vec<&(String, bool)> =
-        log_columns.iter().filter(|(_, enabled)| *enabled).collect();
+    let enabled_columns: Vec<&(String, bool)> = app
+        .log_columns
+        .iter()
+        .filter(|(_, enabled)| *enabled)
+        .collect();
 
     let header_cells = enabled_columns
         .iter()
         .map(|(column, _)| Cell::from(column.clone()).style(Style::default().fg(Color::Black)));
     let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
 
-    let rows = items.items.iter().map(|item| {
+    let rows = items.iter().map(|item| {
         let cells = enabled_columns.iter().map(|(column, _)| {
             Cell::from(Span::styled(
                 item.get(column)
                     .unwrap()
-                    .get(horizontal_offset..)
+                    .get(app.horizontal_offset..)
                     .unwrap_or_default(),
                 Style::default().fg(if item.color.is_some() {
                     Color::Rgb(
@@ -181,15 +176,23 @@ fn draw_log<B>(
         Row::new(cells).bottom_margin(0)
     });
 
-    let mut constraints = vec![Constraint::Min(15); enabled_columns.len() - 1];
-    constraints.push(Constraint::Percentage(100));
+    let constraints: Vec<Constraint> = enabled_columns
+        .iter()
+        .map(|(name, _)| Constraint::Length(app.get_column_lenght(name)))
+        .collect();
 
     let t = Table::new(rows)
         .header(header)
         .block(log_widget)
         .highlight_style(selected_style)
         .widths(&constraints);
-    f.render_stateful_widget(t, area, &mut items.state);
+
+    let mut state = if module == Module::Logs {
+        &mut app.log_lines.state
+    } else {
+        &mut app.search_lines.state
+    };
+    f.render_stateful_widget(t, area, &mut state);
 }
 
 fn draw_search_box<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize, title: &str)
@@ -224,13 +227,10 @@ where
         .split(area);
 
     let auto_scroll = Paragraph::new("AUTO SCROLL")
-        .style(
-            match app.auto_scroll {
-                false => Style::default().add_modifier(Modifier::DIM),
-                true => selected_style(app.color),
-            }
-            ,
-        )
+        .style(match app.auto_scroll {
+            false => Style::default().add_modifier(Modifier::DIM),
+            true => selected_style(app.color),
+        })
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
 
@@ -277,25 +277,13 @@ where
         )
         .split(area);
 
-    draw_log(
-        f,
-        app.color,
-        app.selected_module == Module::Logs,
-        &mut app.log_lines,
-        &app.log_columns,
-        "Log",
-        app.horizontal_offset,
-        main_modules[0],
-    );
+    draw_log(f, app, Module::Logs, "Log", main_modules[0]);
     draw_search_box(f, app, main_modules[1], INDEX_SEARCH, "Search");
     draw_log(
         f,
-        app.color,
-        app.selected_module == Module::SearchResult,
-        &mut app.search_lines,
-        &app.log_columns,
+        app,
+        Module::SearchResult,
         "Search results",
-        app.horizontal_offset,
         main_modules[2],
     );
 }

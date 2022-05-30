@@ -90,6 +90,7 @@ pub enum Module {
     SourcePopup,
     FilterPopup,
     NavigationPopup,
+    LogOptionsPopup,
     ErrorPopup,
     None,
 }
@@ -152,6 +153,8 @@ pub struct App {
     pub show_error_message: bool,
     /// Display the navigation popup
     pub show_navigation_popup: bool,
+    /// Display the navigation popup
+    pub show_log_options_popup: bool,
 
     /// Vector of user input. Entries are uniquely assigned to each UI input, and the selection is
     /// performed with the `input_buffer_index`
@@ -235,6 +238,7 @@ impl App {
             show_filter_popup: false,
             show_navigation_popup: false,
             show_error_message: false,
+            show_log_options_popup: false,
 
             input_buffers: vec![Input::default(); INDEX_MAX],
             input_buffer_index: 0,
@@ -319,11 +323,9 @@ impl App {
         let sources = self.log_analyzer.get_logs();
         self.sources = StatefulTable::with_items(sources);
 
-        if index.is_some() &&  self.sources.items.len() >= index.unwrap() {
+        if index.is_some() && self.sources.items.len() >= index.unwrap() {
             self.sources.state.select(index)
         }
-
-
     }
 
     pub async fn update_filters(&mut self) {
@@ -391,15 +393,15 @@ impl App {
         }
 
         // Handle exit filtering
-        if self.processing.is_processing && events.iter().any(|e| {
-            matches!(e, LogEvent::FilterFinished)
-        }) {
+        if self.processing.is_processing
+            && events.iter().any(|e| matches!(e, LogEvent::FilterFinished))
+        {
             self.log_lines.navigate_to(self.processing.focus_on.clone());
-            self.search_lines.navigate_to(self.processing.focus_on.clone());
+            self.search_lines
+                .navigate_to(self.processing.focus_on.clone());
 
             self.processing.is_processing = false;
             self.processing = Processing::default();
-
         }
 
         // Handle enter searching
@@ -536,21 +538,37 @@ impl App {
                 self.input_buffer_index = INDEX_FILTER_NAME;
                 self.selected_module = Module::FilterPopup;
 
-                if let Some(i) = self.filters.state.selected(){
+                if let Some(i) = self.filters.state.selected() {
                     let (_, alias) = &self.filters.items[i];
-                    if let Some((_, filter)) = self.log_analyzer.get_filters().into_iter().find(|(_, filter)| filter.alias == *alias) {
-                        self.input_buffers[INDEX_FILTER_NAME] = Input::default().with_value(alias.clone());
-                        self.input_buffers[INDEX_FILTER_TYPE] = Input::default().with_value("".into());
-                        self.input_buffers[INDEX_FILTER_DATETIME] = Input::default().with_value(filter.filter.date);
-                        self.input_buffers[INDEX_FILTER_TIMESTAMP] = Input::default().with_value(filter.filter.timestamp);
-                        self.input_buffers[INDEX_FILTER_APP] = Input::default().with_value(filter.filter.app);
-                        self.input_buffers[INDEX_FILTER_SEVERITY] = Input::default().with_value(filter.filter.severity);
-                        self.input_buffers[INDEX_FILTER_FUNCTION] = Input::default().with_value(filter.filter.function);
-                        self.input_buffers[INDEX_FILTER_PAYLOAD] = Input::default().with_value(filter.filter.payload);
+                    if let Some((_, filter)) = self
+                        .log_analyzer
+                        .get_filters()
+                        .into_iter()
+                        .find(|(_, filter)| filter.alias == *alias)
+                    {
+                        self.input_buffers[INDEX_FILTER_NAME] =
+                            Input::default().with_value(alias.clone());
+                        self.input_buffers[INDEX_FILTER_TYPE] =
+                            Input::default().with_value("".into());
+                        self.input_buffers[INDEX_FILTER_DATETIME] =
+                            Input::default().with_value(filter.filter.date);
+                        self.input_buffers[INDEX_FILTER_TIMESTAMP] =
+                            Input::default().with_value(filter.filter.timestamp);
+                        self.input_buffers[INDEX_FILTER_APP] =
+                            Input::default().with_value(filter.filter.app);
+                        self.input_buffers[INDEX_FILTER_SEVERITY] =
+                            Input::default().with_value(filter.filter.severity);
+                        self.input_buffers[INDEX_FILTER_FUNCTION] =
+                            Input::default().with_value(filter.filter.function);
+                        self.input_buffers[INDEX_FILTER_PAYLOAD] =
+                            Input::default().with_value(filter.filter.payload);
                         if let Some((r, g, b)) = filter.filter.color {
-                            self.input_buffers[INDEX_FILTER_RED_COLOR] = Input::default().with_value(r.to_string());
-                            self.input_buffers[INDEX_FILTER_GREEN_COLOR] = Input::default().with_value(g.to_string());
-                            self.input_buffers[INDEX_FILTER_BLUE_COLOR] = Input::default().with_value(b.to_string());
+                            self.input_buffers[INDEX_FILTER_RED_COLOR] =
+                                Input::default().with_value(r.to_string());
+                            self.input_buffers[INDEX_FILTER_GREEN_COLOR] =
+                                Input::default().with_value(g.to_string());
+                            self.input_buffers[INDEX_FILTER_BLUE_COLOR] =
+                                Input::default().with_value(b.to_string());
                         }
                     }
                 }
@@ -609,7 +627,9 @@ impl App {
             self.source_type = 0;
             self.selected_module = Module::Sources;
             self.formats.state.select(Some(0));
-            self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
+            self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX]
+                .iter_mut()
+                .for_each(|b| *b = Input::default().with_value("".into()));
             return;
         }
 
@@ -651,7 +671,9 @@ impl App {
                             self.source_type = 0;
                             self.selected_module = Module::Sources;
                             self.update_sources().await;
-                            self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
+                            self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX]
+                                .iter_mut()
+                                .for_each(|b| *b = Input::default().with_value("".into()));
                         }
                         Err(err) => {
                             self.selected_module = Module::ErrorPopup;
@@ -672,7 +694,9 @@ impl App {
             self.show_filter_popup = false;
             self.selected_module = Module::Filters;
             self.filter_type = 0;
-            self.input_buffers[INDEX_FILTER_NAME..INDEX_FILTER_BLUE_COLOR].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
+            self.input_buffers[INDEX_FILTER_NAME..INDEX_FILTER_BLUE_COLOR]
+                .iter_mut()
+                .for_each(|b| *b = Input::default().with_value("".into()));
             return;
         }
 
@@ -741,7 +765,9 @@ impl App {
                     self.selected_module = Module::Filters;
                     self.filter_type = 0;
                     self.update_filters().await;
-                    self.input_buffers[INDEX_FILTER_NAME..INDEX_FILTER_BLUE_COLOR].iter_mut().for_each(|b| *b = Input::default().with_value("".into()));
+                    self.input_buffers[INDEX_FILTER_NAME..INDEX_FILTER_BLUE_COLOR]
+                        .iter_mut()
+                        .for_each(|b| *b = Input::default().with_value("".into()));
                 }
             }
             _ => {}
@@ -758,7 +784,8 @@ impl App {
                     Ok(index) => {
                         self.show_navigation_popup = false;
                         self.selected_module = self.popup.calling_module;
-                        self.input_buffers[INDEX_NAVIGATION] = Input::default().with_value("".into());
+                        self.input_buffers[INDEX_NAVIGATION] =
+                            Input::default().with_value("".into());
 
                         match self.selected_module {
                             Module::Logs => {
@@ -890,6 +917,7 @@ impl App {
                     _ => {}
                 }
             }
+            Module::LogOptionsPopup => {}
             Module::ErrorPopup => (),
             Module::NavigationPopup => (),
             Module::None => self.selected_module = Module::Logs,
@@ -902,6 +930,27 @@ impl App {
 
     fn decrease_ratio(ratio: &mut u16, step: u16, min: u16) {
         *ratio = if *ratio > min { *ratio - step } else { *ratio }
+    }
+
+    pub fn get_column_lenght(&self, column: &str) -> u16 {
+        let lenght = |log_lines: &Vec<LogLine>| match log_lines
+            .iter()
+            .map(|l| l.get(column).unwrap())
+            .max_by_key(|l| l.len())
+        {
+            Some(l) => Some(l.len().clamp(0, u16::MAX as usize) as u16),
+            _ => None,
+        };
+
+        let max_log_lenght = lenght(&self.log_lines.items);
+        let max_search_lenght = lenght(&self.search_lines.items);
+
+        match (max_log_lenght, max_search_lenght) {
+            (Some(l), Some(s)) => l.max(s),
+            (Some(l), None) => l,
+            (None, Some(s)) => s,
+            _ => 15,
+        }
     }
 
     async fn handle_table_input(&mut self, module: Module, key: KeyEvent) {
@@ -968,10 +1017,31 @@ impl App {
                 }
                 // Navigate up log_lines
                 KeyCode::Left => {
-                    self.horizontal_offset -= if self.horizontal_offset == 0 { 0 } else { 10 }
+                    if self.horizontal_offset > 0 {
+                        self.horizontal_offset -= if self.horizontal_offset == 0 { 0 } else { 10 };
+                        return
+                    }
+                    for (i, (column, enabled)) in self.log_columns.iter().enumerate().rev() {
+                        if !*enabled {
+                            if self.get_column_lenght(column) != 0 {
+                                self.log_columns[i].1 = true;
+                                return
+                            }
+                        }
+                    }
                 }
                 // Navigate down log_lines
-                KeyCode::Right => self.horizontal_offset += 10,
+                KeyCode::Right => {
+                    for (i, (column, enabled)) in self.log_columns.iter().enumerate() {
+                        if i != (self.log_columns.len() - 1) && *enabled {
+                            if self.get_column_lenght(column) != 0 {
+                                self.log_columns[i].1 = false;
+                                return
+                            }
+                        }
+                    }
+                    self.horizontal_offset += 10
+                },
                 // Toogle columns
                 KeyCode::Char('i') => self.log_columns[0].1 = !self.log_columns[0].1,
                 KeyCode::Char('d') => self.log_columns[1].1 = !self.log_columns[1].1,
