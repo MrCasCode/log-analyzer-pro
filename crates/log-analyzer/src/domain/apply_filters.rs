@@ -87,6 +87,7 @@ mod tests {
         };
 
         let line = LogLine {
+            log: "test".to_string(),
             index: "0".to_string(),
             date: "2022-01-02".to_string(),
             timestamp: "200.05".to_string(),
@@ -162,6 +163,7 @@ mod tests {
     #[test]
     fn dont_match_on_multiple_conditions_unsatisfied() {
         let mut line = LogLine {
+            log: "test".to_string(),
             index: "0".to_string(),
             date: "2022-01-02".to_string(),
             timestamp: "200.05".to_string(),

@@ -19,8 +19,8 @@ enum Area {
 impl Area {
     fn current_area(i: usize, elements: usize) -> Area {
         match i {
-            i if i < (elements / 2 - ROOM) => Area::Below,
-            i if ((elements / 2 - ROOM)..=(elements / 2 + ROOM)).contains(&i) => Area::Inside,
+            i if i < ((elements / 2).overflowing_sub(ROOM).0) => Area::Below,
+            i if (((elements / 2).overflowing_sub(ROOM).0)..=(elements / 2 + ROOM)).contains(&i) => Area::Inside,
             i if i > (elements / 2 + ROOM) => Area::Above,
             _ => Area::Below,
         }
@@ -164,18 +164,23 @@ impl<T: Clone> Stateful<T> for LazyStatefulTable<T> {
                         let new_data = self.source.source(initial_element, self.offset);
 
                         let received_elements = new_data.len();
-                        self.items.rotate_right(received_elements);
-
-                        self.items[0..received_elements]
-                            .iter_mut()
-                            .zip(new_data)
-                            .for_each(|(current, new_data)| *current = new_data);
-                        self.offset -= received_elements;
 
                         let selected = i + received_elements - if i > 0 { 1 } else { 0 };
 
-                        self.select_and_set_scroll_on_top(selected);
+                        if received_elements > 0 {
+                            self.items.rotate_right(received_elements);
 
+                            self.items[0..received_elements]
+                                .iter_mut()
+                                .zip(new_data)
+                                .for_each(|(current, new_data)| *current = new_data);
+                            self.offset -= received_elements;
+
+
+                            self.select_and_set_scroll_on_top(selected);
+
+
+                        }
                         selected
                     }
                 },

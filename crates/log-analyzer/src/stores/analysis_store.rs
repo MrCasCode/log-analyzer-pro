@@ -1,6 +1,5 @@
 use crate::models::log_line::LogLine;
-use parking_lot::{RwLock, lock_api::RwLockReadGuard, RawRwLock};
-use std::sync::Arc;
+use parking_lot::{lock_api::RwLockReadGuard, RawRwLock, RwLock};
 
 /// Store for managing processed logs.
 ///
@@ -190,13 +189,7 @@ mod tests {
     fn log_line_with_index(index: usize) -> LogLine {
         LogLine {
             index: index.to_string(),
-            date: "".to_string(),
-            timestamp: "".to_string(),
-            app: "".to_string(),
-            severity: "".to_string(),
-            function: "".to_string(),
-            payload: "".to_string(),
-            color: None,
+            ..Default::default()
         }
     }
 }

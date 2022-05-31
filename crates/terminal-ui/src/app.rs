@@ -25,7 +25,8 @@ pub const INDEX_SOURCE_OK_BUTTON: usize = INDEX_SOURCE_NEW_FORMAT_REGEX + 1;
 /* ------ FILTER INDEXES ------- */
 pub const INDEX_FILTER_NAME: usize = INDEX_SOURCE_OK_BUTTON + 1;
 pub const INDEX_FILTER_TYPE: usize = INDEX_FILTER_NAME + 1;
-pub const INDEX_FILTER_DATETIME: usize = INDEX_FILTER_TYPE + 1;
+pub const INDEX_FILTER_LOG: usize = INDEX_FILTER_TYPE + 1;
+pub const INDEX_FILTER_DATETIME: usize = INDEX_FILTER_LOG + 1;
 pub const INDEX_FILTER_TIMESTAMP: usize = INDEX_FILTER_DATETIME + 1;
 pub const INDEX_FILTER_APP: usize = INDEX_FILTER_TIMESTAMP + 1;
 pub const INDEX_FILTER_SEVERITY: usize = INDEX_FILTER_APP + 1;
@@ -550,6 +551,8 @@ impl App {
                             Input::default().with_value(alias.clone());
                         self.input_buffers[INDEX_FILTER_TYPE] =
                             Input::default().with_value("".into());
+                        self.input_buffers[INDEX_FILTER_LOG] =
+                            Input::default().with_value(filter.filter.log);
                         self.input_buffers[INDEX_FILTER_DATETIME] =
                             Input::default().with_value(filter.filter.date);
                         self.input_buffers[INDEX_FILTER_TIMESTAMP] =
@@ -702,6 +705,7 @@ impl App {
 
         match self.input_buffer_index {
             index @ (INDEX_FILTER_NAME
+            | INDEX_FILTER_LOG
             | INDEX_FILTER_DATETIME
             | INDEX_FILTER_TIMESTAMP
             | INDEX_FILTER_APP
@@ -738,7 +742,7 @@ impl App {
                         alias: self.input_buffers[INDEX_FILTER_NAME].value().to_string(),
                         action: FilterAction::from(self.filter_type),
                         filter: LogLine {
-                            index: "".to_string(),
+                            log: self.input_buffers[INDEX_FILTER_LOG].value().to_string(),
                             date: self.input_buffers[INDEX_FILTER_DATETIME]
                                 .value()
                                 .to_string(),
@@ -758,6 +762,7 @@ impl App {
                                 self.input_buffers[INDEX_FILTER_GREEN_COLOR].value(),
                                 self.input_buffers[INDEX_FILTER_BLUE_COLOR].value(),
                             ),
+                            ..Default::default()
                         },
                     };
                     self.log_analyzer.add_filter(filter);
@@ -1019,13 +1024,13 @@ impl App {
                 KeyCode::Left => {
                     if self.horizontal_offset > 0 {
                         self.horizontal_offset -= if self.horizontal_offset == 0 { 0 } else { 10 };
-                        return
+                        return;
                     }
                     for (i, (column, enabled)) in self.log_columns.iter().enumerate().rev() {
                         if !*enabled {
                             if self.get_column_lenght(column) != 0 {
                                 self.log_columns[i].1 = true;
-                                return
+                                return;
                             }
                         }
                     }
@@ -1036,20 +1041,21 @@ impl App {
                         if i != (self.log_columns.len() - 1) && *enabled {
                             if self.get_column_lenght(column) != 0 {
                                 self.log_columns[i].1 = false;
-                                return
+                                return;
                             }
                         }
                     }
                     self.horizontal_offset += 10
-                },
+                }
                 // Toogle columns
-                KeyCode::Char('i') => self.log_columns[0].1 = !self.log_columns[0].1,
-                KeyCode::Char('d') => self.log_columns[1].1 = !self.log_columns[1].1,
-                KeyCode::Char('t') => self.log_columns[2].1 = !self.log_columns[2].1,
-                KeyCode::Char('a') => self.log_columns[3].1 = !self.log_columns[3].1,
-                KeyCode::Char('s') => self.log_columns[4].1 = !self.log_columns[4].1,
-                KeyCode::Char('f') => self.log_columns[5].1 = !self.log_columns[5].1,
-                KeyCode::Char('p') => self.log_columns[6].1 = !self.log_columns[6].1,
+                KeyCode::Char('l') => self.log_columns[0].1 = !self.log_columns[0].1,
+                KeyCode::Char('i') => self.log_columns[1].1 = !self.log_columns[1].1,
+                KeyCode::Char('d') => self.log_columns[2].1 = !self.log_columns[2].1,
+                KeyCode::Char('t') => self.log_columns[3].1 = !self.log_columns[3].1,
+                KeyCode::Char('a') => self.log_columns[4].1 = !self.log_columns[4].1,
+                KeyCode::Char('s') => self.log_columns[5].1 = !self.log_columns[5].1,
+                KeyCode::Char('f') => self.log_columns[6].1 = !self.log_columns[6].1,
+                KeyCode::Char('p') => self.log_columns[7].1 = !self.log_columns[7].1,
                 KeyCode::Char('r') => self.auto_scroll = !self.auto_scroll,
                 KeyCode::Enter => {
                     if module == Module::SearchResult {

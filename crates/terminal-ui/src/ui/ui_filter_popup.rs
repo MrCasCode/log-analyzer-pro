@@ -3,7 +3,7 @@ use crate::{
         App, INDEX_FILTER_APP, INDEX_FILTER_BLUE_COLOR, INDEX_FILTER_DATETIME,
         INDEX_FILTER_FUNCTION, INDEX_FILTER_GREEN_COLOR, INDEX_FILTER_NAME, INDEX_FILTER_OK_BUTTON,
         INDEX_FILTER_PAYLOAD, INDEX_FILTER_RED_COLOR, INDEX_FILTER_SEVERITY,
-        INDEX_FILTER_TIMESTAMP, INDEX_FILTER_TYPE, parse_color,
+        INDEX_FILTER_TIMESTAMP, INDEX_FILTER_TYPE, parse_color, INDEX_FILTER_LOG,
     },
     styles::selected_style,
 };
@@ -144,7 +144,7 @@ where
         .borders(Borders::ALL)
         .border_style(selected_style(app.color));
 
-    let area = centered_rect(60, 36, f.size());
+    let area = centered_rect(60, 39, f.size());
     f.render_widget(Clear, area); //this clears out the background
     f.render_widget(block, area);
 
@@ -160,6 +160,7 @@ where
                 Constraint::Max(3), // Name
                 Constraint::Max(3), // Type
                 Constraint::Max(1), // Separator
+                Constraint::Max(3), // Filter input
                 Constraint::Max(3), // Filter input
                 Constraint::Max(3), // Filter input
                 Constraint::Max(3), // Filter input
@@ -193,8 +194,15 @@ where
     draw_separator(
         f,
         "Filter",
-        popup_layout[INDEX_FILTER_DATETIME - INDEX_FILTER_NAME + offset],
+        popup_layout[INDEX_FILTER_LOG - INDEX_FILTER_NAME + offset],
         &mut offset,
+    );
+    draw_input_field(
+        f,
+        app,
+        popup_layout[INDEX_FILTER_LOG - INDEX_FILTER_NAME + offset],
+        INDEX_FILTER_LOG,
+        "Log",
     );
     draw_input_field(
         f,

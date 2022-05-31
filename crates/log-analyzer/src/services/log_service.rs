@@ -133,7 +133,7 @@ impl LogService {
             .spawn(move || loop {
                 let num_cpus = num_cpus::get();
                 while let Ok((path, lines)) = receiver.recv() {
-                    let (format, indexes, lines) = log.process_raw_lines(path, lines);
+                    let (format, indexes, lines) = log.process_raw_lines(&path, lines);
 
                     if !lines.is_empty() {
                         let chunk_size = lines.len() / num_cpus;
@@ -155,7 +155,7 @@ impl LogService {
                             let processed: Vec<(Vec<LogLine>, Vec<LogLine>)> = elements
                                 .chunks(chunk_size.max(num_cpus))
                                 .parallel_map_scoped(scope, |chunk| {
-                                    let lines = log.apply_format(&format, chunk);
+                                    let lines = log.apply_format(&format, &path, chunk);
                                     let filtered_lines = log.apply_filters(lines);
                                     let (filtered, search) = log.apply_search(filtered_lines);
                                     (filtered, search)
@@ -188,11 +188,11 @@ impl LogService {
     /// Store the raw received lines in memory and retrieve if there is a format for this log
     fn process_raw_lines(
         &self,
-        path: String,
+        path: &String,
         lines: Vec<String>,
     ) -> (Option<String>, Range<usize>, Vec<String>) {
-        let indexes = self.log_store.add_lines(&path, &lines);
-        let format = self.log_store.get_format(&path);
+        let indexes = self.log_store.add_lines(path, &lines);
+        let format = self.log_store.get_format(path);
         (format, indexes, lines)
     }
 
@@ -200,6 +200,7 @@ impl LogService {
     fn apply_format(
         &self,
         format: &Option<String>,
+        path: &String,
         line_index: &[(String, usize)],
     ) -> Vec<LogLine> {
         let mut format_regex = None;
@@ -211,7 +212,7 @@ impl LogService {
 
         let mut log_lines: Vec<LogLine> = Vec::with_capacity(line_index.len());
         for (line, index) in line_index {
-            let log_line = apply_format(&format_regex.as_ref(), line, *index);
+            let log_line = apply_format(&format_regex.as_ref(), path, line, *index);
             log_lines.push(log_line);
         }
         log_lines

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 /// This struct contains a formated log with its info clasified
 /// in several fields
 pub struct LogLine {
+    pub log: String,
     pub index: String,
     pub date: String,
     pub timestamp: String,
@@ -21,6 +22,7 @@ impl LogLine {
     /// Returns the available fields
     pub fn columns() -> Vec<String> {
         vec![
+            "Log".to_string(),
             "Index".to_string(),
             "Date".to_string(),
             "Timestamp".to_string(),
@@ -34,6 +36,7 @@ impl LogLine {
     /// Gets the field value with the `columns` returned key
     pub fn get(&self, key: &str) -> Option<&String> {
         match key {
+            "Log" => Some(&self.log),
             "Index" => Some(&self.index),
             "Date" => Some(&self.date),
             "Timestamp" => Some(&self.timestamp),
@@ -48,6 +51,7 @@ impl LogLine {
     /// Gets a (key, value) like representation of some fields
     pub fn values(&self) -> Vec<(&str, &String)> {
         vec![
+            ("Log", &self.log),
             ("Date", &self.date),
             ("Timestamp", &self.timestamp),
             ("App", &self.app),
@@ -60,10 +64,11 @@ impl LogLine {
 
 impl IntoIterator for LogLine {
     type Item = String;
-    type IntoIter = std::array::IntoIter<String, 6>;
+    type IntoIter = std::array::IntoIter<String, 7>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIterator::into_iter([
+            self.log,
             self.date,
             self.timestamp,
             self.app,
@@ -76,10 +81,11 @@ impl IntoIterator for LogLine {
 
 impl<'a> IntoIterator for &'a LogLine {
     type Item = &'a String;
-    type IntoIter = std::array::IntoIter<&'a String, 6>;
+    type IntoIter = std::array::IntoIter<&'a String, 7>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIterator::into_iter([
+            &self.log,
             &self.date,
             &self.timestamp,
             &self.app,
@@ -92,10 +98,11 @@ impl<'a> IntoIterator for &'a LogLine {
 
 impl<'a> IntoIterator for &'a mut LogLine {
     type Item = &'a String;
-    type IntoIter = std::array::IntoIter<&'a String, 6>;
+    type IntoIter = std::array::IntoIter<&'a String, 7>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIterator::into_iter([
+            &self.log,
             &self.date,
             &self.timestamp,
             &self.app,
@@ -108,10 +115,11 @@ impl<'a> IntoIterator for &'a mut LogLine {
 
 impl<'a> IntoIterator for &'a &'a mut LogLine {
     type Item = &'a String;
-    type IntoIter = std::array::IntoIter<&'a String, 6>;
+    type IntoIter = std::array::IntoIter<&'a String, 7>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIterator::into_iter([
+            &self.log,
             &self.date,
             &self.timestamp,
             &self.app,
@@ -123,10 +131,11 @@ impl<'a> IntoIterator for &'a &'a mut LogLine {
 }
 impl<'a> IntoIterator for &'a &'a LogLine {
     type Item = &'a String;
-    type IntoIter = std::array::IntoIter<&'a String, 6>;
+    type IntoIter = std::array::IntoIter<&'a String, 7>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIterator::into_iter([
+            &self.log,
             &self.date,
             &self.timestamp,
             &self.app,
