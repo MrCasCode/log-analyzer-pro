@@ -1,6 +1,5 @@
 use tui::style::{Color, Modifier, Style};
 
-
 pub fn selected_style(selected_color: Color) -> Style {
     Style {
         fg: Some(selected_color),

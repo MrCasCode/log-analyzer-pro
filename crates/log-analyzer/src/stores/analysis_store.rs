@@ -30,7 +30,7 @@ pub trait AnalysisStore {
     /// Returns (list of lines, offset from start, index of target)
     fn get_log_lines_containing(
         &self,
-        line: LogLine,
+        index: usize,
         elements: usize,
     ) -> (Vec<LogLine>, usize, usize);
     /// Get a window of `elements` number of lines centered around the target `line`
@@ -38,7 +38,7 @@ pub trait AnalysisStore {
     /// Returns (list of lines, offset from start, index of target)
     fn get_search_lines_containing(
         &self,
-        line: LogLine,
+        index: usize,
         elements: usize,
     ) -> (Vec<LogLine>, usize, usize);
     /// Count the total number of lines
@@ -113,20 +113,20 @@ impl AnalysisStore for InMemmoryAnalysisStore {
 
     fn get_log_lines_containing(
         &self,
-        line: LogLine,
+        index: usize,
         elements: usize,
     ) -> (Vec<LogLine>, usize, usize) {
         let log = self.log.read();
-        InMemmoryAnalysisStore::find_rolling_window(&log, line, elements)
+        InMemmoryAnalysisStore::find_rolling_window(&log, index, elements)
     }
 
     fn get_search_lines_containing(
         &self,
-        line: LogLine,
+        index: usize,
         elements: usize,
     ) -> (Vec<LogLine>, usize, usize) {
         let search_log = self.search_log.read();
-        InMemmoryAnalysisStore::find_rolling_window(&search_log, line, elements)
+        InMemmoryAnalysisStore::find_rolling_window(&search_log, index, elements)
     }
 
     fn reset_log(&self) {
@@ -149,12 +149,12 @@ impl AnalysisStore for InMemmoryAnalysisStore {
 }
 
 impl InMemmoryAnalysisStore {
-    fn find_sorted_index(source: &[LogLine], element: &LogLine) -> usize {
+    fn find_sorted_index(source: &[LogLine], index: usize) -> usize {
         match source.binary_search_by(|e| {
             e.index
                 .parse::<usize>()
                 .unwrap()
-                .cmp(&element.index.parse::<usize>().unwrap())
+                .cmp(&index)
         }) {
             Ok(i) => i,
             Err(i) => i,
@@ -165,10 +165,10 @@ impl InMemmoryAnalysisStore {
     /// Returns (elements, offset, index)
     fn find_rolling_window(
         source: &[LogLine],
-        line: LogLine,
+        index: usize,
         elements: usize,
     ) -> (Vec<LogLine>, usize, usize) {
-        let closest = InMemmoryAnalysisStore::find_sorted_index(source, &line);
+        let closest = InMemmoryAnalysisStore::find_sorted_index(source, index);
         let from = if (elements / 2) < closest {
             closest - elements / 2
         } else {
@@ -177,7 +177,7 @@ impl InMemmoryAnalysisStore {
         let to = (closest + elements / 2).min(source.len());
 
         let lines = source[from..to].to_vec();
-        let index = InMemmoryAnalysisStore::find_sorted_index(&lines, &line);
+        let index = InMemmoryAnalysisStore::find_sorted_index(&lines, index);
         (lines, from, index)
     }
 }

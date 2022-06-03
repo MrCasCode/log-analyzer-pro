@@ -30,8 +30,8 @@ impl LogLine {
             "Severity".to_string(),
             "Function".to_string(),
             "Payload".to_string(),
-            ]
-        }
+        ]
+    }
 
     /// Gets the field value with the `columns` returned key
     pub fn get(&self, key: &str) -> Option<&String> {
@@ -59,6 +59,36 @@ impl LogLine {
             ("Function", &self.function),
             ("Payload", &self.payload),
         ]
+    }
+
+    /// Check if the content of the lines is formatted
+    pub fn is_formated(&self) -> bool {
+        self.into_iter()
+        .any(|field| serde_json::from_str::<Vec<(Option<&str>, &str)>>(&field).is_ok())
+    }
+
+    /// Return a copy of this line with unformatted content
+    pub fn unformat(&self) -> Self {
+        let unformat = |field: &str| {
+            let groups = serde_json::from_str::<Vec<(Option<&str>, &str)>>(field);
+
+            match groups {
+                Ok(groups) => groups.into_iter().fold(String::new(), |acc, g| acc + g.1),
+                _ => field.to_string(),
+            }
+        };
+
+        LogLine {
+            log: unformat(&self.log),
+            index: unformat(&self.index),
+            date: unformat(&self.date),
+            timestamp: unformat(&self.timestamp),
+            app: unformat(&self.app),
+            severity: unformat(&self.severity),
+            function: unformat(&self.function),
+            payload: unformat(&self.payload),
+            color: self.color,
+        }
     }
 }
 

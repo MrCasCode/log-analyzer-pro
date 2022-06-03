@@ -111,7 +111,7 @@ impl LazySource<LogLine> for LogSourcer {
         quantity: usize,
     ) -> (Vec<LogLine>, usize, usize) {
         self.log_analyzer
-            .get_log_lines_containing(element, quantity)
+            .get_log_lines_containing(element.index.parse::<usize>().unwrap(), quantity)
     }
 }
 struct SearchSourcer {
@@ -128,8 +128,10 @@ impl LazySource<LogLine> for SearchSourcer {
         element: LogLine,
         quantity: usize,
     ) -> (Vec<LogLine>, usize, usize) {
+        let index = element.unformat().index.parse().unwrap();
+
         self.log_analyzer
-            .get_search_lines_containing(element, quantity)
+            .get_search_lines_containing(index, quantity)
     }
 }
 
@@ -948,7 +950,7 @@ impl App {
         };
 
         let max_log_lenght = lenght(&self.log_lines.items);
-        let max_search_lenght = lenght(&self.search_lines.items);
+        let max_search_lenght = lenght(&self.search_lines.items.iter().map(|line| line.unformat()).collect());
 
         match (max_log_lenght, max_search_lenght) {
             (Some(l), Some(s)) => l.max(s),
@@ -1060,7 +1062,7 @@ impl App {
                 KeyCode::Enter => {
                     if module == Module::SearchResult {
                         if let Some(current_line) = self.search_lines.get_selected_item() {
-                            self.log_lines.navigate_to(current_line);
+                            self.log_lines.navigate_to(current_line.unformat());
                         }
                     }
                 }

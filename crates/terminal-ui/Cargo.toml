@@ -15,3 +15,4 @@ log-analyzer = { path = '../log-analyzer'}
 tui-input = "0.3.0"
 flume = "0.10.12"
 tokio = {version = "1.18.2", features = ["sync"]}
+serde_json = "1.0.78"

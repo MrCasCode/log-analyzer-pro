@@ -3,18 +3,45 @@ use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Text},
+    text::{Span, Spans, Text},
     widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
     Frame,
 };
 
 use crate::{
     app::{App, Module, INDEX_SEARCH},
-    data::lazy_stateful_table::LazyStatefulTable,
     styles::selected_style,
 };
 
 use super::ui_shared::display_cursor;
+
+trait Convert<T> {
+    fn from_str(s: &str) -> Option<T>;
+}
+
+impl Convert<Color> for Color {
+    fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "BLACK" | "Black" | "black" => Some(Color::Black),
+            "WHITE" | "White" | "white" => Some(Color::White),
+            "RED" | "Red" | "red" => Some(Color::Red),
+            "GREEN" | "Green" | "green" => Some(Color::Green),
+            "YELLOW" | "Yellow" | "yellow" => Some(Color::Yellow),
+            "BLUE" | "Blue" | "blue" => Some(Color::Blue),
+            "MAGENTA" | "Magenta" | "magenta" => Some(Color::Magenta),
+            "CYAN" | "Cyan" | "cyan" => Some(Color::Cyan),
+            "GRAY" | "Gray" | "gray" => Some(Color::Gray),
+            "DARKGRAY" | "DarkGray" | "darkgray" => Some(Color::DarkGray),
+            "LIGHTRED" | "LightRed" | "lightred" => Some(Color::LightRed),
+            "LIGHTGREEN" | "LightGreen" | "lightgreen" => Some(Color::LightGreen),
+            "LIGHTYELLOW" | "LightYellow" | "lightyellow" => Some(Color::LightYellow),
+            "LIGHTBLUE" | "LightBlue" | "lightblue" => Some(Color::LightBlue),
+            "LIGHTMAGENTA" | "LightMagenta" | "lightmagenta" => Some(Color::LightMagenta),
+            "LIGHTCYAN" | "LightCyan" | "lightcyan" => Some(Color::LightCyan),
+            _ => None,
+        }
+    }
+}
 
 fn draw_sources<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
@@ -123,8 +150,65 @@ where
     draw_filters(f, app, left_modules[1]);
 }
 
-fn draw_log<B>(f: &mut Frame<B>, app: &mut App, module: Module, title: &str, area: Rect)
-where
+fn log_line_cell_builder<'a>(line: &'a LogLine, column: &'a str, offset: usize) -> Cell<'a> {
+    Cell::from(Span::styled(
+        line.get(column).unwrap().get(offset..).unwrap_or_default(),
+        Style::default().fg(if line.color.is_some() {
+            Color::Rgb(
+                line.color.unwrap().0,
+                line.color.unwrap().1,
+                line.color.unwrap().2,
+            )
+        } else {
+            Color::Reset
+        }),
+    ))
+}
+
+fn log_search_cell_builder<'a>(line: &'a LogLine, column: &'a str, mut offset: usize) -> Cell<'a> {
+    let groups: Vec<(Option<&str>, &str)> =
+        serde_json::from_str(line.get(column).unwrap()).unwrap();
+
+    Cell::from(Spans::from(
+        groups
+            .into_iter()
+            .filter_map(|(highlight, content)| {
+                let style = match (line.color.is_some(), highlight.map(|c| Color::from_str(c))) {
+                    (_, Some(Some(color))) => {
+                        Style::default().fg(color).add_modifier(Modifier::BOLD)
+                    }
+                    (true, _) => Style::default().fg(Color::Rgb(
+                        line.color.unwrap().0,
+                        line.color.unwrap().1,
+                        line.color.unwrap().2,
+                    )),
+                    _ => Style::default(),
+                };
+
+                if highlight.is_some() {
+                    style.add_modifier(Modifier::BOLD);
+                }
+                let retval = if let Some(str) = content.get(offset..) {
+                    Some(Span::styled(str, style))
+                } else {
+                    None
+                };
+
+                offset = offset.saturating_sub(content.len());
+                retval
+            })
+            .collect::<Vec<Span<'a>>>(),
+    ))
+}
+
+fn draw_log<'a, 's, B>(
+    f: &mut Frame<B>,
+    app: &'s mut App,
+    module: Module,
+    title: &str,
+    cell_builder: &dyn Fn(&'s LogLine, &'s str, usize) -> Cell<'a>,
+    area: Rect,
+) where
     B: Backend,
 {
     let is_selected = app.selected_module == module;
@@ -156,23 +240,9 @@ where
     let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
 
     let rows = items.iter().map(|item| {
-        let cells = enabled_columns.iter().map(|(column, _)| {
-            Cell::from(Span::styled(
-                item.get(column)
-                    .unwrap()
-                    .get(app.horizontal_offset..)
-                    .unwrap_or_default(),
-                Style::default().fg(if item.color.is_some() {
-                    Color::Rgb(
-                        item.color.unwrap().0,
-                        item.color.unwrap().1,
-                        item.color.unwrap().2,
-                    )
-                } else {
-                    Color::Reset
-                }),
-            ))
-        });
+        let cells = enabled_columns
+            .iter()
+            .map(|(column, _)| cell_builder(&item, column, app.horizontal_offset));
         Row::new(cells).bottom_margin(0)
     });
 
@@ -277,13 +347,21 @@ where
         )
         .split(area);
 
-    draw_log(f, app, Module::Logs, "Log", main_modules[0]);
+    draw_log(
+        f,
+        app,
+        Module::Logs,
+        "Log",
+        &log_line_cell_builder,
+        main_modules[0],
+    );
     draw_search_box(f, app, main_modules[1], INDEX_SEARCH, "Search");
     draw_log(
         f,
         app,
         Module::SearchResult,
         "Search results",
+        &log_search_cell_builder,
         main_modules[2],
     );
 }
