@@ -548,6 +548,7 @@ impl App {
                         .into_iter()
                         .find(|(_, filter)| filter.alias == *alias)
                     {
+                        self.filter_type = filter.action.into();
                         self.input_buffers[INDEX_FILTER_NAME] =
                             Input::default().with_value(alias.clone());
                         self.input_buffers[INDEX_FILTER_TYPE] =

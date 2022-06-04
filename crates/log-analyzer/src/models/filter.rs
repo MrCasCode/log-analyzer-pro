@@ -24,6 +24,16 @@ impl From<usize> for FilterAction {
     }
 }
 
+impl Into<usize> for FilterAction {
+    fn into(self) -> usize {
+        match self {
+            FilterAction::INCLUDE => 0,
+            FilterAction::EXCLUDE => 1,
+            FilterAction::MARKER => 2,
+        }
+    }
+}
+
 impl Default for FilterAction {
     fn default() -> Self {
         FilterAction::MARKER

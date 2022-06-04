@@ -37,7 +37,7 @@ pub trait LogStore {
 
 pub struct InMemmoryLogStore {
     /// K: log_path -> V: lines
-    raw_lines: RwLock<HashMap<String, Vec<String>>>,
+    raw_lines: RwLock<Vec<(String, Vec<String>)>>,
     /// K: log_path -> V: format
     format: RwLock<HashMap<String, String>>,
     /// K: log_path -> V: enabled
@@ -49,7 +49,7 @@ pub struct InMemmoryLogStore {
 impl InMemmoryLogStore {
     pub fn new() -> Self {
         Self {
-            raw_lines: RwLock::new(HashMap::default()),
+            raw_lines: RwLock::new(Vec::default()),
             format: RwLock::new(HashMap::default()),
             enabled: RwLock::new(HashMap::default()),
             source: RwLock::new(HashMap::default()),
@@ -88,20 +88,20 @@ impl LogStore for InMemmoryLogStore {
     fn add_line(&self, log_id: &str, line: &str) {
         let mut raw_lines_lock = self.raw_lines.write();
 
-        if !raw_lines_lock.contains_key(log_id) {
-            raw_lines_lock.insert(log_id.to_string(), Vec::new());
+        if !raw_lines_lock.iter().any(|(id, _)| log_id == id) {
+            raw_lines_lock.push((log_id.to_string(), Vec::new()));
         }
-        let raw_lines = raw_lines_lock.get_mut(log_id).unwrap();
-        raw_lines.push(line.to_string());
+        let raw_lines = raw_lines_lock.iter_mut().find(|(id, _)| log_id == id).unwrap();
+        raw_lines.1.push(line.to_string());
     }
 
     fn add_lines(&self, log_id: &str, lines: &[String]) -> Range<usize> {
         let mut raw_lines_lock = self.raw_lines.write();
 
-        if !raw_lines_lock.contains_key(log_id) {
-            raw_lines_lock.insert(log_id.to_string(), Vec::new());
+        if !raw_lines_lock.iter().any(|(id, _)| log_id == id) {
+            raw_lines_lock.push((log_id.to_string(), Vec::new()));
         }
-        let raw_lines = raw_lines_lock.get_mut(log_id).unwrap();
+        let (_, raw_lines) = raw_lines_lock.iter_mut().find(|(id, _)| log_id == id).unwrap();
         let current_len = raw_lines.len();
         raw_lines.append(&mut lines.to_vec());
 
@@ -110,15 +110,15 @@ impl LogStore for InMemmoryLogStore {
     }
 
     fn get_lines(&self, log_id: &str) -> Vec<String> {
-        match self.raw_lines.read().get(log_id) {
-            Some(lines) => lines.clone(),
+        match self.raw_lines.read().iter().find(|(id, _)| log_id == id) {
+            Some((_, lines)) => lines.clone(),
             _ => Vec::new(),
         }
     }
 
     fn extract_lines(&self, log_id: &str) -> Vec<String> {
         let mut w = self.raw_lines.write();
-        let lines = std::mem::take(w.get_mut(log_id).unwrap());
+        let (_, lines) = std::mem::take(w.iter_mut().find(|(id, _)| log_id == id).unwrap());
 
         lines
     }
@@ -141,8 +141,8 @@ impl LogStore for InMemmoryLogStore {
     fn get_total_lines(&self) -> usize {
         self.raw_lines
             .read()
-            .values()
-            .fold(0, |acc, v| acc + v.len())
+            .iter()
+            .fold(0, |acc, (_, v)| acc + v.len())
     }
 
     fn get_source(&self, id: &str) -> Option<Arc<Box<dyn LogSource + Send + Sync>>> {
