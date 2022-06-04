@@ -72,7 +72,12 @@ impl AnalysisStore for InMemmoryAnalysisStore {
     fn add_lines(&self, lines: &[LogLine]) {
         let mut w = self.log.write();
         for line in lines {
-            w.push(line.clone());
+            let index = w.len();
+
+            let mut line = line.clone();
+            line.index = index.to_string();
+
+            w.push(line);
         }
     }
 

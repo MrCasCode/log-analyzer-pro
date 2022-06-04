@@ -95,7 +95,7 @@ mod tests {
             severity: "INFO".to_string(),
             function: "call".to_string(),
             payload: "some useful information".to_string(),
-            color: None,
+            ..Default::default()
         };
 
         let mut filter = LogFilter::from(Filter {
@@ -171,7 +171,7 @@ mod tests {
             severity: "INFO".to_string(),
             function: "call".to_string(),
             payload: "some useful information".to_string(),
-            color: None,
+            ..Default::default()
         };
         let filter = LogFilter::from(Filter {
             filter: LogLine {

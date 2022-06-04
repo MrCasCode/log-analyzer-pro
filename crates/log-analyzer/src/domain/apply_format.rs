@@ -36,7 +36,7 @@ pub fn apply_format(format: &Option<&Regex>, path: &str, line: &str, index: usiz
                     severity: unwrap_or_empty_string(&captures, "SEVERITY"),
                     function: unwrap_or_empty_string(&captures, "FUNCTION"),
                     payload: unwrap_or_empty_string(&captures, "PAYLOAD"),
-                    color: None,
+                    ..Default::default()
                 }
             }
             _ => default_log_line(line, path, index),

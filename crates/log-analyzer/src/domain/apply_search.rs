@@ -31,18 +31,25 @@ pub fn format_search(search: &Regex, log_line: &LogLine) -> LogLine {
 
                 let mut string_groups = vec![];
 
-                let mut offset = 0;
-                for (group, (start, end)) in groups {
-                    let unmatched = &s[offset..start];
-                    if !unmatched.is_empty() {
-                        string_groups.push((None, unmatched));
+                // If there are captured groups manage the splitting between unformatted and captured parts of the string
+                if !groups.is_empty() {
+                    let mut offset = 0;
+                    for (group, (start, end)) in groups {
+                        let unmatched = &s[offset..start];
+                        if !unmatched.is_empty() {
+                            string_groups.push((None, unmatched));
+                        }
+                        string_groups.push((Some(group), &s[start..end]));
+                        offset = end;
                     }
-                    string_groups.push((Some(group), &s[start..end]));
-                    offset = end;
-                }
 
-                if offset < (s.len() - 1) {
-                    string_groups.push((None, &s[offset..]));
+                    if offset < (s.len().saturating_sub(1)) {
+                        string_groups.push((None, &s[offset..]));
+                    }
+                }
+                // Otherwise just add the entire string without any format
+                else {
+                    string_groups.push((None, s));
                 }
                 return match serde_json::to_string(&string_groups) {
                     Ok(serialized) => serialized,
@@ -81,7 +88,7 @@ mod tests {
             severity: "INFO".into(),
             function: "test_format".into(),
             payload: "Highlighting search matches is going to be awesome, I tell you".into(),
-            color: None,
+            ..Default::default()
         };
 
         let regex = Regex::new("(?P<BLACK>awesome)").unwrap();
