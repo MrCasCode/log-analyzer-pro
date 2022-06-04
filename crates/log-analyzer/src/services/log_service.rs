@@ -19,7 +19,7 @@ use crate::stores::analysis_store::AnalysisStore;
 use crate::stores::log_store::LogStore;
 use crate::stores::processing_store::ProcessingStore;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 /// Notify of state changes
 pub enum Event {
     // Currently processing lines (from, to)

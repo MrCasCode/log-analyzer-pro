@@ -8,10 +8,9 @@ Terminal ui is a crate used to visualize logs
 documentation = "https://github.com/MrCasCode/log-analyzer-pro"
 homepage = "https://github.com/MrCasCode/log-analyzer-pro"
 repository = "https://github.com/MrCasCode/log-analyzer-pro"
-keywords = ["log", "filter", "analysis", "regex", "search", "pattern"]
-categories = ["log-analysis", "command-line-utilities", "text-processing"]
+keywords = ["log", "filter", "analysis", "regex", "search"]
+categories = ["development-tools::debugging", "command-line-utilities", "text-processing"]
 license = "Unlicense OR MIT"
-readme = "README.md"
 autotests = false
 edition = "2021"
 
@@ -23,7 +22,7 @@ async-std = { version = "1.10.0", features = ["unstable"]}
 crossterm = "0.23"
 tui = "0.17.0"
 unicode-width = "0.1.9"
-log-analyzer = { path = '../log-analyzer'}
+log-analyzer = {version = "0.1.0", path = "../log-analyzer"}
 tui-input = "0.3.0"
 flume = "0.10.12"
 tokio = {version = "1.18.2", features = ["sync"]}

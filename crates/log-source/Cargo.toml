@@ -8,23 +8,15 @@ Log source is a crate used to read files and sockets
 documentation = "https://github.com/MrCasCode/log-analyzer-pro"
 homepage = "https://github.com/MrCasCode/log-analyzer-pro"
 repository = "https://github.com/MrCasCode/log-analyzer-pro"
-keywords = ["log", "filter", "analysis", "regex", "search", "pattern"]
-categories = ["log-analysis", "command-line-utilities", "text-processing"]
+keywords = ["log", "filter", "analysis", "regex", "search"]
+categories = ["development-tools::debugging", "command-line-utilities", "text-processing"]
 license = "Unlicense OR MIT"
-readme = "README.md"
 autotests = false
 edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0.53", features = ["backtrace"] }
-regex = "1.5.4"
 async-std = { version = "1.10.0", features = ["unstable"]}
 async-trait = "0.1.52"
-futures = "0.3.19"
-chrono = "0.4.19"
-serde = {version = "1.0.135", features = ["derive"]}
-serde_json = "1.0.78"
-rustc-hash = { version = "1.1"}
 parking_lot = "0.12.0"
 flume = "0.10.12"
-tokio = {version = "1.18.2", features = ["sync"]}

@@ -15,7 +15,7 @@ use flume::Sender;
 use parking_lot::RwLock;
 
 
-#[derive(PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum SourceType {
     FILE,
     WS,

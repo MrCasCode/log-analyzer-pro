@@ -3,7 +3,7 @@ use super::log_line::LogLine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug)]
 /// Describe the action of a filter
 pub enum FilterAction {
     /// Just add a color marker

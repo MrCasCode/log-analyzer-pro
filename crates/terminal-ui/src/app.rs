@@ -81,7 +81,7 @@ impl Default for Processing {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Module {
     Sources,
     Filters,
