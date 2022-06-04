@@ -1,6 +1,6 @@
 [package]
 name = "log-analyzer"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["Mario Casals <mario.casals.hernandez@gmail.com>"]
 description = """
 log analyzer is a crate used to read, filter and search logs
@@ -27,4 +27,4 @@ rustc-hash = { version = "1.1"}
 parking_lot = "0.12.0"
 flume = "0.10.12"
 tokio = {version = "1.18.2", features = ["sync"]}
-log-source = {path = "../log-source", version = "0.1.0"}
+log-source = {path = "../log-source", version = "0.1.1"}

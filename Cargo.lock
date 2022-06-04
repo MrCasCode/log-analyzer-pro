@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "log-analyzer"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "async-std",
@@ -649,7 +649,7 @@ dependencies = [
 
 [[package]]
 name = "log-analyzer-pro"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
  "async-std",
  "clap",
@@ -658,7 +658,7 @@ dependencies = [
 
 [[package]]
 name = "log-source"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-std",
@@ -1097,7 +1097,7 @@ dependencies = [
 
 [[package]]
 name = "terminal-ui"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "async-std",

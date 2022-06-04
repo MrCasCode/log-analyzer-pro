@@ -12,9 +12,12 @@ A powerful log analyzer application for the terminal written in Rust
 
 ## Installation
 
+````
+cargo install log-analyzer-pro
+````
+
 The binary executable is `lap`
 
-### TODO
 
 ## Usage
 ### Menu navigation
@@ -71,6 +74,29 @@ When focused on a tab, list or table, use the <kbd>Arrows</kbd> to change the se
 
 * If you're in `Search results` you can go to the selected index in `Log module`: <kbd>⏎ Enter</kbd>
 
+### Search highlighting
+You can highlight search results by using regex groups in your search. The name of the group should be the color you want to highlight the match with. The list of available colors is:
+- BLACK
+- WHITE
+- RED
+- GREEN
+- YELLOW
+- BLUE
+- MAGENTA
+- CYAN
+- GRAY
+- DARKGRAY
+- LIGHTRED
+- LIGHTGREEN
+- LIGHTYELLOW
+- LIGHTBLUE
+- LIGHTMAGENTA
+- LIGHTCYAN
+
+Search example:
+```
+(?P<GREEN>success_ok).*(?P<BLUE>message)
+````
 
 ## Customization
 You can use a json file to customize the application look and preload formats and filters

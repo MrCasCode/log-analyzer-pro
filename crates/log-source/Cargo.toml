@@ -1,6 +1,6 @@
 [package]
 name = "log-source"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Mario Casals <mario.casals.hernandez@gmail.com>"]
 description = """
 Log source is a crate used to read files and sockets
