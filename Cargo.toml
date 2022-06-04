@@ -1,6 +1,6 @@
 [package]
 name = "lap"
-version = "0.1.0"  #:version
+version = "1.0.0"  #:version
 authors = ["Mario Casals <mario.casals.hernandez@gmail.com>"]
 description = """
 Log Analyzer Pro is a command line application giving powerful filtering and searching
@@ -15,7 +15,7 @@ repository = "https://github.com/MrCasCode/log-analyzer-pro"
 keywords = ["log", "filter", "analysis", "regex", "search", "pattern"]
 categories = ["log-analysis", "command-line-utilities", "text-processing"]
 license = "Unlicense OR MIT"
-exclude = ["HomebrewFormula"]
+readme = "README.md"
 autotests = false
 edition = "2021"
 
