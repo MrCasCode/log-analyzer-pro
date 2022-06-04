@@ -44,13 +44,13 @@ pub trait LogAnalyzer {
     fn add_log(
         &self,
         source_type: usize,
-        source_address: &String,
+        source_address: &str,
         format: Option<&String>,
     ) -> Result<()>;
     /// Add a new format to the list of available formats
-    fn add_format(&self, alias: &String, regex: &String) -> Result<()>;
+    fn add_format(&self, alias: &str, regex: &str) -> Result<()>;
     /// Start a new search
-    fn add_search(&self, regex: &String);
+    fn add_search(&self, regex: &str);
     /// Add a new filter to the list of available filters
     fn add_filter(&self, filter: Filter);
     /// Get log lines between the range [from, to]
@@ -88,9 +88,9 @@ pub trait LogAnalyzer {
     /// Get how many lines are in the search log
     fn get_total_searched_lines(&self) -> usize;
     /// Enable or disable the given source
-    fn toggle_source(&self, id: &String);
+    fn toggle_source(&self, id: &str);
     /// Enable or disable the given filter
-    fn toggle_filter(&self, id: &String);
+    fn toggle_filter(&self, id: &str);
     fn on_event(&self) -> broadcast::Receiver<Event>;
 }
 
@@ -188,7 +188,7 @@ impl LogService {
     /// Store the raw received lines in memory and retrieve if there is a format for this log
     fn process_raw_lines(
         &self,
-        path: &String,
+        path: &str,
         lines: Vec<String>,
     ) -> (Option<String>, Range<usize>, Vec<String>) {
         let indexes = self.log_store.add_lines(path, &lines);
@@ -200,7 +200,7 @@ impl LogService {
     fn apply_format(
         &self,
         format: &Option<String>,
-        path: &String,
+        path: &str,
         line_index: &[(String, usize)],
     ) -> Vec<LogLine> {
         let mut format_regex = None;
@@ -272,7 +272,7 @@ impl LogAnalyzer for LogService {
     fn add_log(
         &self,
         source_type: usize,
-        source_address: &String,
+        source_address: &str,
         format: Option<&String>,
     ) -> Result<()> {
         let log_store = self.log_store.clone();
@@ -281,7 +281,7 @@ impl LogAnalyzer for LogService {
 
         let log_source = Arc::new(async_std::task::block_on(create_source(
             source_type,
-            source_address.clone(),
+            source_address.to_string(),
         ))?);
         log_store.add_log(source_address, log_source.clone(), format, true);
         self.run_log_source(log_source);
@@ -289,14 +289,14 @@ impl LogAnalyzer for LogService {
         Ok(())
     }
 
-    fn add_format(&self, alias: &String, regex: &String) -> Result<()> {
+    fn add_format(&self, alias: &str, regex: &str) -> Result<()> {
         let format = Format::new(alias, regex)?;
 
         self.processing_store.add_format(format.alias, format.regex);
         Ok(())
     }
 
-    fn add_search(&self, regex: &String) {
+    fn add_search(&self, regex: &str) {
         let re = Regex::new(regex);
         self.analysis_store.reset_search();
 
@@ -304,7 +304,7 @@ impl LogAnalyzer for LogService {
             self.analysis_store.add_search_query(regex);
 
             let analysis_store = self.analysis_store.clone();
-            let regex_str = regex.clone();
+            let regex_str = regex.to_string();
             let sender = self.event_channel.clone();
 
             std::thread::Builder::new()
@@ -415,7 +415,7 @@ impl LogAnalyzer for LogService {
         self.analysis_store.get_total_searched_lines()
     }
 
-    fn toggle_source(&self, id: &String) {
+    fn toggle_source(&self, id: &str) {
         if let Some((enabled, _log, _format)) = self
             .log_store
             .get_logs()
@@ -434,7 +434,7 @@ impl LogAnalyzer for LogService {
         }
     }
 
-    fn toggle_filter(&self, id: &String) {
+    fn toggle_filter(&self, id: &str) {
         self.processing_store.toggle_filter(id);
 
         // Reset everything because we need to recompute the log from the raw lines

@@ -91,7 +91,6 @@ pub enum Module {
     SourcePopup,
     FilterPopup,
     NavigationPopup,
-    LogOptionsPopup,
     ErrorPopup,
     None,
 }
@@ -597,7 +596,7 @@ impl App {
         match key.code {
             KeyCode::Enter => {
                 self.log_analyzer
-                    .add_search(&self.input_buffers[INDEX_SEARCH].value().into());
+                    .add_search(self.input_buffers[INDEX_SEARCH].value());
             }
             _ => {
                 input_backend::to_input_request(Event::Key(key))
@@ -924,7 +923,6 @@ impl App {
                     _ => {}
                 }
             }
-            Module::LogOptionsPopup => {}
             Module::ErrorPopup => (),
             Module::NavigationPopup => (),
             Module::None => self.selected_module = Module::Logs,
@@ -940,17 +938,23 @@ impl App {
     }
 
     pub fn get_column_lenght(&self, column: &str) -> u16 {
-        let lenght = |log_lines: &Vec<LogLine>| match log_lines
-            .iter()
-            .map(|l| l.get(column).unwrap())
-            .max_by_key(|l| l.len())
-        {
-            Some(l) => Some(l.len().clamp(0, u16::MAX as usize) as u16),
-            _ => None,
+        let lenght = |log_lines: &Vec<LogLine>| {
+            log_lines
+                .iter()
+                .map(|l| l.get(column).unwrap())
+                .max_by_key(|l| l.len())
+                .map(|l| l.len().clamp(0, u16::MAX as usize) as u16)
         };
 
         let max_log_lenght = lenght(&self.log_lines.items);
-        let max_search_lenght = lenght(&self.search_lines.items.iter().map(|line| line.unformat()).collect());
+        let max_search_lenght = lenght(
+            &self
+                .search_lines
+                .items
+                .iter()
+                .map(|line| line.unformat())
+                .collect(),
+        );
 
         match (max_log_lenght, max_search_lenght) {
             (Some(l), Some(s)) => l.max(s),
@@ -1029,22 +1033,21 @@ impl App {
                         return;
                     }
                     for (i, (column, enabled)) in self.log_columns.iter().enumerate().rev() {
-                        if !*enabled {
-                            if self.get_column_lenght(column) != 0 {
-                                self.log_columns[i].1 = true;
-                                return;
-                            }
+                        if !*enabled && self.get_column_lenght(column) != 0 {
+                            self.log_columns[i].1 = true;
+                            return;
                         }
                     }
                 }
                 // Navigate down log_lines
                 KeyCode::Right => {
                     for (i, (column, enabled)) in self.log_columns.iter().enumerate() {
-                        if i != (self.log_columns.len() - 1) && *enabled {
-                            if self.get_column_lenght(column) != 0 {
-                                self.log_columns[i].1 = false;
-                                return;
-                            }
+                        if i != (self.log_columns.len() - 1)
+                            && *enabled
+                            && self.get_column_lenght(column) != 0
+                        {
+                            self.log_columns[i].1 = false;
+                            return;
                         }
                     }
                     self.horizontal_offset += 10

@@ -173,7 +173,7 @@ fn log_search_cell_builder<'a>(line: &'a LogLine, column: &'a str, mut offset: u
         groups
             .into_iter()
             .filter_map(|(highlight, content)| {
-                let style = match (line.color.is_some(), highlight.map(|c| Color::from_str(c))) {
+                let style = match (line.color.is_some(), highlight.map(Color::from_str)) {
                     (_, Some(Some(color))) => {
                         Style::default().fg(color).add_modifier(Modifier::BOLD)
                     }
@@ -188,11 +188,7 @@ fn log_search_cell_builder<'a>(line: &'a LogLine, column: &'a str, mut offset: u
                 if highlight.is_some() {
                     style.add_modifier(Modifier::BOLD);
                 }
-                let retval = if let Some(str) = content.get(offset..) {
-                    Some(Span::styled(str, style))
-                } else {
-                    None
-                };
+                let retval = content.get(offset..).map(|str| Span::styled(str, style));
 
                 offset = offset.saturating_sub(content.len());
                 retval
@@ -242,7 +238,7 @@ fn draw_log<'a, 's, B>(
     let rows = items.iter().map(|item| {
         let cells = enabled_columns
             .iter()
-            .map(|(column, _)| cell_builder(&item, column, app.horizontal_offset));
+            .map(|(column, _)| cell_builder(item, column, app.horizontal_offset));
         Row::new(cells).bottom_margin(0)
     });
 
@@ -257,12 +253,12 @@ fn draw_log<'a, 's, B>(
         .highlight_style(selected_style)
         .widths(&constraints);
 
-    let mut state = if module == Module::Logs {
+    let state = if module == Module::Logs {
         &mut app.log_lines.state
     } else {
         &mut app.search_lines.state
     };
-    f.render_stateful_widget(t, area, &mut state);
+    f.render_stateful_widget(t, area, state);
 }
 
 fn draw_search_box<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize, title: &str)

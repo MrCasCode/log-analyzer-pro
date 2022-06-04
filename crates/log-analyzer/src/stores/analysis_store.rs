@@ -10,7 +10,7 @@ pub trait AnalysisStore {
     /// Add a list of searched lines
     fn add_search_lines(&self, lines: &[LogLine]);
     /// Change the search query
-    fn add_search_query(&self, query: &String);
+    fn add_search_query(&self, query: &str);
     /// Get the current search query
     fn get_search_query(&self) -> Option<String>;
     /// Clear the processed log
@@ -88,9 +88,9 @@ impl AnalysisStore for InMemmoryAnalysisStore {
         }
     }
 
-    fn add_search_query(&self, query: &String) {
+    fn add_search_query(&self, query: &str) {
         let mut w = self.search_query.write();
-        *w = Some(query.clone());
+        *w = Some(query.to_string());
     }
 
     fn get_search_query(&self) -> Option<String> {

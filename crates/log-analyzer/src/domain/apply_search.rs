@@ -21,11 +21,9 @@ pub fn format_search(search: &Regex, log_line: &LogLine) -> LogLine {
             let mut groups = vec![];
             if let Some(m) = search.captures(s) {
                 // Capture all matched groups
-                for name in search.capture_names() {
-                    if let Some(group) = name {
-                        if let Some(capture) = m.name(group) {
-                            groups.push((group, (capture.start(), capture.end())))
-                        }
+                for group in search.capture_names().flatten() {
+                    if let Some(capture) = m.name(group) {
+                        groups.push((group, (capture.start(), capture.end())))
                     }
                 }
 
@@ -94,7 +92,8 @@ mod tests {
         let regex = Regex::new("(?P<BLACK>awesome)").unwrap();
 
         let formatted_line = format_search(&regex, &line);
-        let unformat: Vec<(Option<&str>, &str)> = serde_json::from_str(&formatted_line.payload).unwrap();
+        let unformat: Vec<(Option<&str>, &str)> =
+            serde_json::from_str(&formatted_line.payload).unwrap();
 
         // We expect 3 groups since they are splitted by the formatted block "awesome"
         assert!(unformat.len() == 3);

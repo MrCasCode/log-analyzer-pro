@@ -64,7 +64,7 @@ impl LogLine {
     /// Check if the content of the lines is formatted
     pub fn is_formated(&self) -> bool {
         self.into_iter()
-        .any(|field| serde_json::from_str::<Vec<(Option<&str>, &str)>>(&field).is_ok())
+        .any(|field| serde_json::from_str::<Vec<(Option<&str>, &str)>>(field).is_ok())
     }
 
     /// Return a copy of this line with unformatted content

@@ -14,7 +14,7 @@ pub trait ProcessingStore {
     /// * `format`: regex formatting
     fn add_format(&self, id: String, format: String);
     /// Get the format data for the requested format alias
-    fn get_format(&self, id: &String) -> Option<String>;
+    fn get_format(&self, id: &str) -> Option<String>;
     /// Get a list of formats
     fn get_formats(&self) -> Vec<Format>;
     /// Add a new filter to the store
@@ -24,7 +24,7 @@ pub trait ProcessingStore {
     /// Get a list of filters together with their enabled state
     fn get_filters(&self) -> Vec<(bool, Filter)>;
     /// Switch the enabled state for the given filter
-    fn toggle_filter(&self, id: &String);
+    fn toggle_filter(&self, id: &str);
 }
 pub struct InMemmoryProcessingStore {
     /// Map of <alias, Regex string>
@@ -54,7 +54,7 @@ impl ProcessingStore for InMemmoryProcessingStore {
         w.insert(id, format);
     }
 
-    fn get_format(&self, id: &String) -> Option<String> {
+    fn get_format(&self, id: &str) -> Option<String> {
         let r = self.formats.read();
         r.get(id).cloned()
     }
@@ -85,7 +85,7 @@ impl ProcessingStore for InMemmoryProcessingStore {
                     *enabled,
                     Filter {
                         alias: id.clone(),
-                        action: action.clone(),
+                        action: *action,
                         filter: filter.clone(),
                     },
                 )
@@ -95,7 +95,7 @@ impl ProcessingStore for InMemmoryProcessingStore {
         filters
     }
 
-    fn toggle_filter(&self, id: &String) {
+    fn toggle_filter(&self, id: &str) {
         let mut w = self.filters.write();
         if let Some((_, _, enabled)) = w.get_mut(id) {
             *enabled = !*enabled

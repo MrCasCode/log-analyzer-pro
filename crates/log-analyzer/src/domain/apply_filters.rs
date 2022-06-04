@@ -9,7 +9,7 @@ fn filter_line<'a>(filtering: &'a LogFilter, log_line: &'a mut LogLine) -> bool 
     let mut is_match = false;
     for (key, re) in &filtering.filters {
         is_match = re.is_match(log_line.get(key).unwrap());
-        if is_match == false {
+        if !is_match {
             break;
         }
     }
@@ -42,9 +42,9 @@ pub fn apply_filters(filters: &[LogFilter], mut log_line: LogLine) -> Option<Log
 
     // If should be included check for any potential override of color with markers and return the line
     for filter in include_filters.clone() {
-        if filter_line(&filter, &mut log_line) {
+        if filter_line(filter, &mut log_line) {
             for marker_filter in marker_filters {
-                filter_line(&marker_filter, &mut log_line);
+                filter_line(marker_filter, &mut log_line);
             }
 
             return Some(log_line);
@@ -53,7 +53,7 @@ pub fn apply_filters(filters: &[LogFilter], mut log_line: LogLine) -> Option<Log
 
     // If is not included and is excluded -> exclude it
     for filter in exclude_filters {
-        if filter_line(&filter, &mut log_line) {
+        if filter_line(filter, &mut log_line) {
             return None;
         }
     }
@@ -61,14 +61,14 @@ pub fn apply_filters(filters: &[LogFilter], mut log_line: LogLine) -> Option<Log
     // If there are no including filters filter it just with markers and return the line
     if include_filters.count() == 0 {
         for filter in marker_filters {
-            filter_line(&filter, &mut log_line);
+            filter_line(filter, &mut log_line);
         }
 
         return Some(log_line);
     }
 
     // There was including filters but we didnt match. Line not to be included
-    return None;
+    return None
 }
 
 #[cfg(test)]

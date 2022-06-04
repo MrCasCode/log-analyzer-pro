@@ -12,14 +12,14 @@ pub struct Format {
 
 
 impl Format {
-    pub fn new(alias: &String, regex: &String) -> Result<Self> {
+    pub fn new(alias: &str, regex: &str) -> Result<Self> {
         if alias.is_empty() || regex.is_empty() {
             return Err(anyhow!("Error when creating new format.\nPlease review alias and regex are not empty"));
         }
 
         let re = Regex::new(regex);
         match re {
-            Ok(_) => Ok(Format{alias: alias.clone(), regex : regex.clone()}),
+            Ok(_) => Ok(Format{alias: alias.to_string(), regex : regex.to_string()}),
             Err(_) => Err(anyhow!("Could not compile regex.\nPlease review regex syntax"))
         }
     }
