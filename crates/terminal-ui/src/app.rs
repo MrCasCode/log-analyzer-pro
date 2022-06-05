@@ -1,6 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use log_analyzer::models::filter::FilterAction;
+use log_analyzer::models::log_line_styled::LogLineStyled;
 use log_analyzer::models::{filter::Filter, log_line::LogLine};
 use log_analyzer::services::log_service::{Event as LogEvent, LogAnalyzer};
 use tui::style::Color;
@@ -52,31 +53,23 @@ pub struct PopupInteraction {
 
 pub struct Processing {
     pub is_processing: bool,
-    pub focus_on: LogLine,
+    pub focus_on: usize,
 }
 
 impl Processing {
-    fn set_focus(&mut self, focus: Option<LogLine>) {
+    fn set_focus(&mut self, focus: Option<usize>) {
         self.focus_on = match focus {
             Some(focus) => focus,
-            None => LogLine {
-                index: "0".to_string(),
-                ..Default::default()
-            },
+            None => 0,
         }
     }
 }
 
 impl Default for Processing {
     fn default() -> Self {
-        let default_line = LogLine {
-            index: "0".to_string(),
-            ..Default::default()
-        };
-
         Self {
             is_processing: false,
-            focus_on: default_line,
+            focus_on: 0,
         }
     }
 }
@@ -106,29 +99,26 @@ impl LazySource<LogLine> for LogSourcer {
 
     fn source_elements_containing(
         &self,
-        element: LogLine,
+        index: usize,
         quantity: usize,
     ) -> (Vec<LogLine>, usize, usize) {
-        self.log_analyzer
-            .get_log_lines_containing(element.index.parse::<usize>().unwrap(), quantity)
+        self.log_analyzer.get_log_lines_containing(index, quantity)
     }
 }
 struct SearchSourcer {
     log_analyzer: Box<Arc<dyn LogAnalyzer>>,
 }
 
-impl LazySource<LogLine> for SearchSourcer {
-    fn source(&self, from: usize, to: usize) -> Vec<LogLine> {
+impl LazySource<LogLineStyled> for SearchSourcer {
+    fn source(&self, from: usize, to: usize) -> Vec<LogLineStyled> {
         self.log_analyzer.get_search_lines(from, to)
     }
 
     fn source_elements_containing(
         &self,
-        element: LogLine,
+        index: usize,
         quantity: usize,
-    ) -> (Vec<LogLine>, usize, usize) {
-        let index = element.unformat().index.parse().unwrap();
-
+    ) -> (Vec<LogLineStyled>, usize, usize) {
         self.log_analyzer
             .get_search_lines_containing(index, quantity)
     }
@@ -181,7 +171,7 @@ pub struct App {
     /// Lazy widget for the main view of the logs
     pub log_lines: LazyStatefulTable<LogLine>,
     /// Lazy widget for the main view of the search
-    pub search_lines: LazyStatefulTable<LogLine>,
+    pub search_lines: LazyStatefulTable<LogLineStyled>,
     /// Apply an offset to the logs to simulate horizontal scrolling
     pub horizontal_offset: usize,
 
@@ -388,8 +378,11 @@ impl App {
         if events.iter().any(|e| matches!(e, LogEvent::Filtering)) {
             self.processing.is_processing = true;
 
-            self.processing
-                .set_focus(self.log_lines.get_selected_item());
+            self.processing.set_focus(
+                self.log_lines
+                    .get_selected_item()
+                    .map(|l| l.index.parse().unwrap()),
+            );
             self.log_lines.clear();
             self.search_lines.clear();
         }
@@ -398,9 +391,8 @@ impl App {
         if self.processing.is_processing
             && events.iter().any(|e| matches!(e, LogEvent::FilterFinished))
         {
-            self.log_lines.navigate_to(self.processing.focus_on.clone());
-            self.search_lines
-                .navigate_to(self.processing.focus_on.clone());
+            self.log_lines.navigate_to(self.processing.focus_on);
+            self.search_lines.navigate_to(self.processing.focus_on);
 
             self.processing.is_processing = false;
             self.processing = Processing::default();
@@ -409,8 +401,11 @@ impl App {
         // Handle enter searching
         if events.iter().any(|e| matches!(e, LogEvent::Searching)) {
             self.processing.is_processing = true;
-            self.processing
-                .set_focus(self.search_lines.get_selected_item());
+            self.processing.set_focus(
+                self.search_lines
+                    .get_selected_item()
+                    .map(|l| l.unformat().index.parse().unwrap()),
+            );
             self.search_lines.clear();
         }
 
@@ -418,8 +413,7 @@ impl App {
         if events.iter().any(|e| matches!(e, LogEvent::SearchFinished)) {
             self.processing.is_processing = false;
 
-            self.search_lines
-                .navigate_to(self.processing.focus_on.clone());
+            self.search_lines.navigate_to(self.processing.focus_on);
             self.processing = Processing::default();
         }
     }
@@ -586,11 +580,11 @@ impl App {
     }
 
     async fn handle_log_input(&mut self, key: KeyEvent) {
-        self.handle_table_input(Module::Logs, key).await;
+        self.handle_table_log_input(key).await;
     }
 
     async fn handle_search_result_input(&mut self, key: KeyEvent) {
-        self.handle_table_input(Module::SearchResult, key).await;
+        self.handle_table_search_input(key).await;
     }
 
     async fn handle_search_input(&mut self, key: KeyEvent) {
@@ -797,18 +791,10 @@ impl App {
 
                         match self.selected_module {
                             Module::Logs => {
-                                let element = LogLine {
-                                    index: index.to_string(),
-                                    ..Default::default()
-                                };
-                                self.log_lines.navigate_to(element);
+                                self.log_lines.navigate_to(index);
                             }
                             Module::SearchResult => {
-                                let element = LogLine {
-                                    index: index.to_string(),
-                                    ..Default::default()
-                                };
-                                self.search_lines.navigate_to(element);
+                                self.search_lines.navigate_to(index);
                             }
                             _ => {}
                         }
@@ -966,12 +952,7 @@ impl App {
         }
     }
 
-    async fn handle_table_input(&mut self, module: Module, key: KeyEvent) {
-        let table = if module == Module::Logs {
-            &mut self.log_lines
-        } else {
-            &mut self.search_lines
-        };
+    async fn handle_table_log_input(&mut self, key: KeyEvent) {
         let multiplier = if key.modifiers == KeyModifiers::ALT {
             10
         } else {
@@ -994,7 +975,7 @@ impl App {
                 KeyCode::Char('G') => {
                     self.input_buffer_index = INDEX_NAVIGATION;
                     self.show_navigation_popup = true;
-                    self.popup.calling_module = module;
+                    self.popup.calling_module = Module::Logs;
                     self.selected_module = Module::NavigationPopup;
                 }
                 _ => {}
@@ -1004,28 +985,127 @@ impl App {
                 KeyCode::Up => {
                     let steps = multiplier;
                     for _ in 0..steps {
-                        table.previous();
+                        self.log_lines.previous();
                     }
                 }
                 // Navigate down log_lines
                 KeyCode::Down => {
                     let steps = multiplier;
                     for _ in 0..steps {
-                        table.next();
+                        self.log_lines.next();
                     }
                 }
                 // Navigate up log_lines
                 KeyCode::PageUp => {
                     let steps = 100 * multiplier;
                     for _ in 0..steps {
-                        table.previous();
+                        self.log_lines.previous();
                     }
                 }
                 // Navigate down log_lines
                 KeyCode::PageDown => {
                     let steps = 100 * multiplier;
                     for _ in 0..steps {
-                        table.next();
+                        self.log_lines.next();
+                    }
+                }
+                // Navigate up log_lines
+                KeyCode::Left => {
+                    if self.horizontal_offset > 0 {
+                        self.horizontal_offset -= if self.horizontal_offset == 0 { 0 } else { 10 };
+                        return;
+                    }
+                    for (i, (column, enabled)) in self.log_columns.iter().enumerate().rev() {
+                        if !*enabled && self.get_column_lenght(column) != 0 {
+                            self.log_columns[i].1 = true;
+                            return;
+                        }
+                    }
+                }
+                // Navigate down log_lines
+                KeyCode::Right => {
+                    for (i, (column, enabled)) in self.log_columns.iter().enumerate() {
+                        if i != (self.log_columns.len() - 1)
+                            && *enabled
+                            && self.get_column_lenght(column) != 0
+                        {
+                            self.log_columns[i].1 = false;
+                            return;
+                        }
+                    }
+                    self.horizontal_offset += 10
+                }
+                // Toogle columns
+                KeyCode::Char('l') => self.log_columns[0].1 = !self.log_columns[0].1,
+                KeyCode::Char('i') => self.log_columns[1].1 = !self.log_columns[1].1,
+                KeyCode::Char('d') => self.log_columns[2].1 = !self.log_columns[2].1,
+                KeyCode::Char('t') => self.log_columns[3].1 = !self.log_columns[3].1,
+                KeyCode::Char('a') => self.log_columns[4].1 = !self.log_columns[4].1,
+                KeyCode::Char('s') => self.log_columns[5].1 = !self.log_columns[5].1,
+                KeyCode::Char('f') => self.log_columns[6].1 = !self.log_columns[6].1,
+                KeyCode::Char('p') => self.log_columns[7].1 = !self.log_columns[7].1,
+                KeyCode::Char('r') => self.auto_scroll = !self.auto_scroll,
+                // Nothing
+                _ => {}
+            },
+        }
+    }
+
+    async fn handle_table_search_input(&mut self, key: KeyEvent){
+        let multiplier = if key.modifiers == KeyModifiers::ALT {
+            10
+        } else {
+            1
+        };
+        match key.modifiers {
+            KeyModifiers::SHIFT => match key.code {
+                KeyCode::Char('W') => {
+                    App::decrease_ratio(&mut self.log_search_size_percentage, 5, 10)
+                }
+                KeyCode::Char('S') => {
+                    App::increase_ratio(&mut self.log_search_size_percentage, 5, 90)
+                }
+                KeyCode::Char('A') => {
+                    App::decrease_ratio(&mut self.side_main_size_percentage, 5, 0)
+                }
+                KeyCode::Char('D') => {
+                    App::increase_ratio(&mut self.side_main_size_percentage, 5, 50)
+                }
+                KeyCode::Char('G') => {
+                    self.input_buffer_index = INDEX_NAVIGATION;
+                    self.show_navigation_popup = true;
+                    self.popup.calling_module = Module::SearchResult;
+                    self.selected_module = Module::NavigationPopup;
+                }
+                _ => {}
+            },
+            _ => match key.code {
+                // Navigate up log_lines
+                KeyCode::Up => {
+                    let steps = multiplier;
+                    for _ in 0..steps {
+                        self.search_lines.previous();
+                    }
+                }
+                // Navigate down log_lines
+                KeyCode::Down => {
+                    let steps = multiplier;
+                    for _ in 0..steps {
+                        self.search_lines.next();
+                    }
+                }
+                // Navigate up log_lines
+                KeyCode::PageUp => {
+                    let steps = 100 * multiplier;
+                    for _ in 0..steps {
+                        self.search_lines.previous();
+                    }
+                }
+                // Navigate down log_lines
+                KeyCode::PageDown => {
+                    let steps = 100 * multiplier;
+                    for _ in 0..steps {
+                        self.search_lines.next();
                     }
                 }
                 // Navigate up log_lines
@@ -1065,10 +1145,8 @@ impl App {
                 KeyCode::Char('p') => self.log_columns[7].1 = !self.log_columns[7].1,
                 KeyCode::Char('r') => self.auto_scroll = !self.auto_scroll,
                 KeyCode::Enter => {
-                    if module == Module::SearchResult {
-                        if let Some(current_line) = self.search_lines.get_selected_item() {
-                            self.log_lines.navigate_to(current_line.unformat());
-                        }
+                    if let Some(current_line) = self.search_lines.get_selected_item() {
+                            self.log_lines.navigate_to(current_line.unformat().index.parse().unwrap());
                     }
                 }
                 // Nothing

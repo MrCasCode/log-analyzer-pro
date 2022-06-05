@@ -7,7 +7,7 @@ const ROOM: usize = 100;
 
 pub trait LazySource<T> {
     fn source(&self, from: usize, to: usize) -> Vec<T>;
-    fn source_elements_containing(&self, element: T, quantity: usize) -> (Vec<T>, usize, usize);
+    fn source_elements_containing(&self, element: usize, quantity: usize) -> (Vec<T>, usize, usize);
 }
 
 enum Area {
@@ -55,7 +55,7 @@ impl<T: Clone> LazyStatefulTable<T> {
     }
 
 
-    pub fn navigate_to(&mut self, element: T) {
+    pub fn navigate_to(&mut self, element: usize) {
         let source = self.source.source_elements_containing(element, CAPACITY);
 
         self.items = source.0;
@@ -213,7 +213,7 @@ mod tests {
 
         fn source_elements_containing(
             &self,
-            _element: T,
+            _element: usize,
             _quantity: usize,
         ) -> (Vec<T>, usize, usize) {
             todo!()

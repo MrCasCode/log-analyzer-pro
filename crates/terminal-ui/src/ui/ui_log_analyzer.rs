@@ -1,4 +1,4 @@
-use log_analyzer::models::log_line::LogLine;
+use log_analyzer::models::{log_line::LogLine, log_line_styled::LogLineStyled};
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -165,18 +165,14 @@ fn log_line_cell_builder<'a>(line: &'a LogLine, column: &'a str, offset: usize) 
     ))
 }
 
-fn log_search_cell_builder<'a>(line: &'a LogLine, column: &'a str, mut offset: usize) -> Cell<'a> {
-    let content = line.get(column).unwrap();
-    let groups: Vec<(Option<&str>, &str)> = match serde_json::from_str(content) {
-        Ok(groups) => groups,
-        Err(_) => vec![(None, content)]
-    };
+fn log_search_cell_builder<'a>(line: &'a LogLineStyled, column: &'a str, mut offset: usize) -> Cell<'a> {
+    let groups = line.get(column).unwrap();
 
     Cell::from(Spans::from(
         groups
             .into_iter()
             .filter_map(|(highlight, content)| {
-                let style = match (line.color.is_some(), highlight.map(Color::from_str)) {
+                let style = match (line.color.is_some(), highlight.as_ref().map(|c| Color::from_str(c))) {
                     (_, Some(Some(color))) => {
                         Style::default().fg(color).add_modifier(Modifier::BOLD)
                     }
@@ -205,17 +201,13 @@ fn draw_log<'a, 's, B>(
     app: &'s mut App,
     module: Module,
     title: &str,
-    cell_builder: &dyn Fn(&'s LogLine, &'s str, usize) -> Cell<'a>,
     area: Rect,
 ) where
     B: Backend,
 {
     let is_selected = app.selected_module == module;
-    let items = if module == Module::Logs {
-        &app.log_lines.items
-    } else {
-        &app.search_lines.items
-    };
+    let items = &app.log_lines.items;
+
     let log_widget = Block::default()
         .title(title)
         .borders(Borders::ALL)
@@ -241,7 +233,7 @@ fn draw_log<'a, 's, B>(
     let rows = items.iter().map(|item| {
         let cells = enabled_columns
             .iter()
-            .map(|(column, _)| cell_builder(item, column, app.horizontal_offset));
+            .map(|(column, _)| log_line_cell_builder(item, column, app.horizontal_offset));
         Row::new(cells).bottom_margin(0)
     });
 
@@ -256,11 +248,63 @@ fn draw_log<'a, 's, B>(
         .highlight_style(selected_style)
         .widths(&constraints);
 
-    let state = if module == Module::Logs {
-        &mut app.log_lines.state
-    } else {
-        &mut app.search_lines.state
-    };
+    let state = &mut app.log_lines.state;
+    f.render_stateful_widget(t, area, state);
+}
+
+fn draw_search<'a, 's, B>(
+    f: &mut Frame<B>,
+    app: &'s mut App,
+    module: Module,
+    title: &str,
+    area: Rect,
+) where
+    B: Backend,
+{
+    let is_selected = app.selected_module == module;
+    let items = &app.search_lines.items;
+
+    let log_widget = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(match is_selected {
+            true => selected_style(app.color),
+            _ => Style::default(),
+        });
+
+    let selected_style = Style::default().add_modifier(Modifier::REVERSED);
+    let normal_style = Style::default().bg(app.color).add_modifier(Modifier::BOLD);
+
+    let enabled_columns: Vec<&(String, bool)> = app
+        .log_columns
+        .iter()
+        .filter(|(_, enabled)| *enabled)
+        .collect();
+
+    let header_cells = enabled_columns
+        .iter()
+        .map(|(column, _)| Cell::from(column.clone()).style(Style::default().fg(Color::Black)));
+    let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
+
+    let rows = items.iter().map(|item| {
+        let cells = enabled_columns
+            .iter()
+            .map(|(column, _)| log_search_cell_builder(item, column, app.horizontal_offset));
+        Row::new(cells).bottom_margin(0)
+    });
+
+    let constraints: Vec<Constraint> = enabled_columns
+        .iter()
+        .map(|(name, _)| Constraint::Length(app.get_column_lenght(name)))
+        .collect();
+
+    let t = Table::new(rows)
+        .header(header)
+        .block(log_widget)
+        .highlight_style(selected_style)
+        .widths(&constraints);
+
+    let state = &mut app.search_lines.state;
     f.render_stateful_widget(t, area, state);
 }
 
@@ -311,7 +355,7 @@ where
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL))
         .gauge_style(Style::default().fg(app.color))
-        .percent((if total > 0 { filtered * 100 / total } else { 0 }) as u16)
+        .percent((if total > 0 { (filtered * 100 / total).min(100) } else { 0 }) as u16)
         .label(label);
     f.render_widget(gauge, bottom_bar_layout[1]);
 
@@ -320,7 +364,7 @@ where
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL))
         .gauge_style(Style::default().fg(app.color))
-        .percent((if total > 0 { searched * 100 / total } else { 0 }) as u16)
+        .percent((if total > 0 { (searched * 100 / total).min(100) } else { 0 }) as u16)
         .label(label);
 
     f.render_widget(gauge, bottom_bar_layout[2]);
@@ -351,16 +395,14 @@ where
         app,
         Module::Logs,
         "Log",
-        &log_line_cell_builder,
         main_modules[0],
     );
     draw_search_box(f, app, main_modules[1], INDEX_SEARCH, "Search");
-    draw_log(
+    draw_search(
         f,
         app,
         Module::SearchResult,
         "Search results",
-        &log_search_cell_builder,
         main_modules[2],
     );
 }

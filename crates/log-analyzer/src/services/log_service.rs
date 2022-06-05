@@ -14,6 +14,7 @@ use crate::domain::apply_filters::apply_filters;
 use crate::domain::apply_format::apply_format;
 use crate::domain::apply_search::{apply_search, format_search};
 use crate::models::filter::LogFilter;
+use crate::models::log_line_styled::LogLineStyled;
 use crate::models::{filter::Filter, format::Format, log_line::LogLine};
 use crate::stores::analysis_store::AnalysisStore;
 use crate::stores::log_store::LogStore;
@@ -56,7 +57,7 @@ pub trait LogAnalyzer {
     /// Get log lines between the range [from, to]
     fn get_log_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
     /// Get search lines between the range [from, to]
-    fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine>;
+    fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLineStyled>;
     /// Get a list of log lines of `elements` size centered on the `line` element or the closest
     /// Returns (elements, offset, index)
     fn get_log_lines_containing(
@@ -71,7 +72,7 @@ pub trait LogAnalyzer {
         &self,
         index: usize,
         elements: usize,
-    ) -> (Vec<LogLine>, usize, usize);
+    ) -> (Vec<LogLineStyled>, usize, usize);
 
     /// Get the current managed logs
     /// Returns a vector of (enabled, log_path, Option<format>)
@@ -353,16 +354,20 @@ impl LogAnalyzer for LogService {
         self.analysis_store.get_log_lines(from, to)
     }
 
-    fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLine> {
-        let mut search_lines_containing = self.analysis_store.get_search_lines(from, to);
+    fn get_search_lines(&self, from: usize, to: usize) -> Vec<LogLineStyled> {
+        let search_lines_containing = self.analysis_store.get_search_lines(from, to);
+        let mut styled_search_lines = vec![];
 
         if !search_lines_containing.is_empty() {
             // If there are search lines we are sure that there is a valid search query
             let query = Regex::new(&self.analysis_store.get_search_query().unwrap()).unwrap();
-            search_lines_containing = search_lines_containing.into_iter().map(|l| format_search(&query, &l)).collect();
+            styled_search_lines = search_lines_containing
+                .into_iter()
+                .map(|l| format_search(&query, &l))
+                .collect();
         }
 
-        search_lines_containing
+        styled_search_lines
     }
 
     fn get_log_lines_containing(
@@ -370,25 +375,33 @@ impl LogAnalyzer for LogService {
         index: usize,
         elements: usize,
     ) -> (Vec<LogLine>, usize, usize) {
-        self.analysis_store.get_log_lines_containing(index, elements)
+        self.analysis_store
+            .get_log_lines_containing(index, elements)
     }
 
     fn get_search_lines_containing(
         &self,
         index: usize,
         elements: usize,
-    ) -> (Vec<LogLine>, usize, usize) {
-        let mut search_lines_containing = self
+    ) -> (Vec<LogLineStyled>, usize, usize) {
+        let search_lines_containing = self
             .analysis_store
             .get_search_lines_containing(index, elements);
+
+        let mut styled_search_lines: (Vec<LogLineStyled>, usize, usize) =
+            (vec![], search_lines_containing.1, search_lines_containing.2);
 
         if !search_lines_containing.0.is_empty() {
             // If there are search lines we are sure that there is a valid search query
             let query = Regex::new(&self.analysis_store.get_search_query().unwrap()).unwrap();
-            search_lines_containing.0 = search_lines_containing.0.into_iter().map(|l| format_search(&query, &l)).collect();
+            styled_search_lines.0 = search_lines_containing
+                .0
+                .into_iter()
+                .map(|l| format_search(&query, &l))
+                .collect();
         }
 
-        search_lines_containing
+        styled_search_lines
     }
 
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)> {
