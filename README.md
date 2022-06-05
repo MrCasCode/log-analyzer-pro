@@ -100,10 +100,10 @@ Search example:
 
 ## Customization
 You can use a json file to customize the application look and preload formats and filters by using a command line argument:
+
 ````
 lap --settings path_to_settings_file.json
 ````
-
 
 * Primary color: RGB tuple (reed, green, blue)
 * Formats: List of {alias, regex}

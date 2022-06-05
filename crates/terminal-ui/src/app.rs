@@ -596,6 +596,7 @@ impl App {
     async fn handle_search_input(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Enter => {
+                self.search_lines.clear();
                 self.log_analyzer
                     .add_search(self.input_buffers[INDEX_SEARCH].value());
             }

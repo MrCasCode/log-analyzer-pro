@@ -104,6 +104,8 @@ impl LogSource for FileSource {
                 }
                 Err(_) => break,
             }
+
+            async_std::task::sleep(Duration::from_millis(300)).await;
         }
         // restore after quitting
         self.enabled.store(true, Ordering::Relaxed);

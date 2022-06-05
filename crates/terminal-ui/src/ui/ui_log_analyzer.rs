@@ -166,8 +166,11 @@ fn log_line_cell_builder<'a>(line: &'a LogLine, column: &'a str, offset: usize) 
 }
 
 fn log_search_cell_builder<'a>(line: &'a LogLine, column: &'a str, mut offset: usize) -> Cell<'a> {
-    let groups: Vec<(Option<&str>, &str)> =
-        serde_json::from_str(line.get(column).unwrap()).unwrap();
+    let content = line.get(column).unwrap();
+    let groups: Vec<(Option<&str>, &str)> = match serde_json::from_str(content) {
+        Ok(groups) => groups,
+        Err(_) => vec![(None, content)]
+    };
 
     Cell::from(Spans::from(
         groups
