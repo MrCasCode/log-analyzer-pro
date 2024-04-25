@@ -1,9 +1,6 @@
-
 use std::error::Error;
 
-
 use terminal_ui::async_main;
-
 
 use clap::Parser;
 
@@ -15,7 +12,6 @@ struct Args {
     #[clap(short, long)]
     settings: Option<String>,
 }
-
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();

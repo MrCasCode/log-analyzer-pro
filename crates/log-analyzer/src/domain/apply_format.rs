@@ -45,7 +45,6 @@ pub fn apply_format(format: &Option<&Regex>, path: &str, line: &str, index: usiz
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

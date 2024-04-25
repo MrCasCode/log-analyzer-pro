@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
+mod domain;
 mod models;
 mod services;
 mod stores;
-mod domain;
 
 use log_source::source::log_source::SourceType;
 
@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use stores::analysis_store::InMemmoryAnalysisStore;
 use stores::log_store::InMemmoryLogStore;
-use stores::processing_store::{ProcessingStore, InMemmoryProcessingStore};
+use stores::processing_store::{InMemmoryProcessingStore, ProcessingStore};
 
 use async_std::task;
 
@@ -31,11 +31,7 @@ async fn async_main() -> Result<()> {
     processing_store.add_format(file.clone(), r"(?P<PAYLOAD>.*)".to_string());
 
     let log_service = LogService::new(log_store, processing_store, analysis_store);
-    log_service.add_log(
-        SourceType::FILE.into(),
-        &file,
-        None,
-    )?;
+    log_service.add_log(SourceType::FILE.into(), &file, None)?;
 
     loop {
         async_std::task::sleep(Duration::from_secs(10)).await;

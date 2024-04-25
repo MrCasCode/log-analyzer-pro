@@ -1,26 +1,30 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use regex::Regex;
-use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Format {
     pub alias: String,
-    pub regex: String
+    pub regex: String,
 }
-
-
 
 impl Format {
     pub fn new(alias: &str, regex: &str) -> Result<Self> {
         if alias.is_empty() || regex.is_empty() {
-            return Err(anyhow!("Error when creating new format.\nPlease review alias and regex are not empty"));
+            return Err(anyhow!(
+                "Error when creating new format.\nPlease review alias and regex are not empty"
+            ));
         }
 
         let re = Regex::new(regex);
         match re {
-            Ok(_) => Ok(Format{alias: alias.to_string(), regex : regex.to_string()}),
-            Err(_) => Err(anyhow!("Could not compile regex.\nPlease review regex syntax"))
+            Ok(_) => Ok(Format {
+                alias: alias.to_string(),
+                regex: regex.to_string(),
+            }),
+            Err(_) => Err(anyhow!(
+                "Could not compile regex.\nPlease review regex syntax"
+            )),
         }
     }
 }
@@ -38,7 +42,7 @@ mod tests {
 
     #[test]
     fn deserialize() {
-        let json =r#"{"alias":"All","regex":"(?P<PAYLOAD>.*)"}"#;
+        let json = r#"{"alias":"All","regex":"(?P<PAYLOAD>.*)"}"#;
 
         let format: Result<Format, serde_json::Error> = serde_json::from_str(json);
         assert!(format.is_ok())

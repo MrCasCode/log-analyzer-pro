@@ -91,7 +91,10 @@ impl LogStore for InMemmoryLogStore {
         if !raw_lines_lock.iter().any(|(id, _)| log_id == id) {
             raw_lines_lock.push((log_id.to_string(), Vec::new()));
         }
-        let raw_lines = raw_lines_lock.iter_mut().find(|(id, _)| log_id == id).unwrap();
+        let raw_lines = raw_lines_lock
+            .iter_mut()
+            .find(|(id, _)| log_id == id)
+            .unwrap();
         raw_lines.1.push(line.to_string());
     }
 
@@ -101,7 +104,10 @@ impl LogStore for InMemmoryLogStore {
         if !raw_lines_lock.iter().any(|(id, _)| log_id == id) {
             raw_lines_lock.push((log_id.to_string(), Vec::new()));
         }
-        let (_, raw_lines) = raw_lines_lock.iter_mut().find(|(id, _)| log_id == id).unwrap();
+        let (_, raw_lines) = raw_lines_lock
+            .iter_mut()
+            .find(|(id, _)| log_id == id)
+            .unwrap();
         let current_len = raw_lines.len();
         raw_lines.append(&mut lines.to_vec());
 

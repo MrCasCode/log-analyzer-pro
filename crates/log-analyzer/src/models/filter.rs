@@ -40,7 +40,6 @@ impl Default for FilterAction {
     }
 }
 
-
 #[derive(Default, Clone, Debug)]
 /// Struct with cached vector of log_line keys with their associated regex
 pub struct LogFilter {
@@ -48,16 +47,18 @@ pub struct LogFilter {
     /// List of (log_line_key, regex)
     pub filters: Vec<(String, Regex)>,
     /// Color - if any
-    pub color: Option<(u8, u8, u8)>
+    pub color: Option<(u8, u8, u8)>,
 }
 
 impl From<Filter> for LogFilter {
     fn from(f: Filter) -> Self {
-        Self { action: f.action, filters: f.get_filters(), color: f.filter.color }
+        Self {
+            action: f.action,
+            filters: f.get_filters(),
+            color: f.filter.color,
+        }
     }
 }
-
-
 
 #[derive(Default, Serialize, Deserialize, Debug)]
 /// Base filter definition.
@@ -65,7 +66,7 @@ pub struct Filter {
     pub alias: String,
     pub action: FilterAction,
     /// Contains the regex filtering in the `LogLine` fields
-    pub filter: LogLine
+    pub filter: LogLine,
 }
 
 impl Filter {

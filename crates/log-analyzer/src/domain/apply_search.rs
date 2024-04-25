@@ -51,7 +51,7 @@ pub fn format_search(search: &Regex, log_line: &LogLine) -> LogLineStyled {
                 }
                 return string_groups;
             }
-            return vec![(None, s.to_string())]
+            return vec![(None, s.to_string())];
         })
         .collect();
 

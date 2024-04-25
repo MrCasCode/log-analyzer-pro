@@ -5,24 +5,20 @@ use crate::{
     },
     styles::selected_style,
 };
-use tui::{
-    backend::{Backend},
+use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs},
     Frame,
 };
 
 use super::{ui_popup::centered_rect, ui_shared::display_cursor};
 
-fn draw_source_type_selector<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
-    let titles = ["FILE", "WS"]
+fn draw_source_type_selector(f: &mut Frame, app: &App, area: Rect) {
+    let titles: Vec<_> = ["FILE", "WS"]
         .iter()
-        .map(|t| Spans::from(vec![Span::styled(*t, Style::default().fg(Color::White))]))
+        .map(|t| Line::from(vec![Span::styled(*t, Style::default().fg(Color::White))]))
         .collect();
 
     let source_type_widget = Tabs::new(titles)
@@ -37,10 +33,7 @@ where
     f.render_widget(source_type_widget, area);
 }
 
-fn draw_source_path<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_source_path(f: &mut Frame, app: &App, area: Rect) {
     let source_path_widget = Paragraph::new(app.input_buffers[INDEX_SOURCE_PATH].value())
         .style(match INDEX_SOURCE_PATH == app.input_buffer_index {
             false => Style::default(),
@@ -54,16 +47,13 @@ where
     }
 }
 
-fn draw_format_list<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_format_list(f: &mut Frame, app: &mut App, area: Rect) {
     let formats: Vec<ListItem> = app
         .formats
         .items
         .iter()
         .map(|i| {
-            let lines = vec![Spans::from(i.clone())];
+            let lines = vec![Line::from(i.clone())];
             ListItem::new(lines).style(Style::default().fg(Color::White))
         })
         .collect();
@@ -85,10 +75,7 @@ where
     f.render_stateful_widget(formats, area, &mut app.formats.state);
 }
 
-fn draw_new_format_alias<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_new_format_alias(f: &mut Frame, app: &App, area: Rect) {
     let format_alias_widget =
         Paragraph::new(app.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].value())
             .style(
@@ -101,14 +88,15 @@ where
 
     f.render_widget(format_alias_widget, area);
     if INDEX_SOURCE_NEW_FORMAT_ALIAS == app.input_buffer_index {
-        display_cursor(f, area, app.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].cursor())
+        display_cursor(
+            f,
+            area,
+            app.input_buffers[INDEX_SOURCE_NEW_FORMAT_ALIAS].cursor(),
+        )
     }
 }
 
-fn draw_new_format_regex<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_new_format_regex(f: &mut Frame, app: &App, area: Rect) {
     let format_regex_widget =
         Paragraph::new(app.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].value())
             .style(
@@ -121,14 +109,15 @@ where
 
     f.render_widget(format_regex_widget, area);
     if INDEX_SOURCE_NEW_FORMAT_REGEX == app.input_buffer_index {
-        display_cursor(f, area, app.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].cursor())
+        display_cursor(
+            f,
+            area,
+            app.input_buffers[INDEX_SOURCE_NEW_FORMAT_REGEX].cursor(),
+        )
     }
 }
 
-fn draw_ok_button<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_ok_button(f: &mut Frame, app: &App, area: Rect) {
     let ok_button_widget = Paragraph::new("OK")
         .style(match INDEX_SOURCE_OK_BUTTON == app.input_buffer_index {
             false => Style::default(),
@@ -139,10 +128,7 @@ where
     f.render_widget(ok_button_widget, area);
 }
 
-pub fn draw_source_popup<B>(f: &mut Frame<B>, app: &mut App)
-where
-    B: Backend,
-{
+pub fn draw_source_popup(f: &mut Frame, app: &mut App) {
     let block = Block::default()
         .title("Add new source")
         .borders(Borders::ALL)
