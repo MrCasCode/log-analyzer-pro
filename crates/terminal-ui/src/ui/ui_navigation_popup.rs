@@ -2,8 +2,7 @@ use crate::{
     app::{App, INDEX_NAVIGATION},
     styles::selected_style,
 };
-use tui::{
-    backend::Backend,
+use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -11,10 +10,7 @@ use tui::{
 
 use super::{ui_popup::centered_rect, ui_shared::display_cursor};
 
-fn draw_navigation_input<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_navigation_input(f: &mut Frame, app: &App, area: Rect) {
     let format_regex_widget = Paragraph::new(app.input_buffers[INDEX_NAVIGATION].value())
         .style(selected_style(app.color))
         .block(Block::default().borders(Borders::ALL).title("Index"));
@@ -25,10 +21,7 @@ where
     }
 }
 
-pub fn draw_navigation_popup<B>(f: &mut Frame<B>, app: &mut App)
-where
-    B: Backend,
-{
+pub fn draw_navigation_popup(f: &mut Frame, app: &mut App) {
     let block = Block::default()
         .title("Navigate to index")
         .borders(Borders::ALL)

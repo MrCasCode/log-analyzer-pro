@@ -1,4 +1,4 @@
-use tui::layout::{Layout, Rect, Constraint, Direction};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 pub fn centered_rect(percent_x: u16, y_size: u16, r: Rect) -> Rect {

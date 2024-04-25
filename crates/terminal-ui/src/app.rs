@@ -4,7 +4,7 @@ use log_analyzer::models::filter::FilterAction;
 use log_analyzer::models::log_line_styled::LogLineStyled;
 use log_analyzer::models::{filter::Filter, log_line::LogLine};
 use log_analyzer::services::log_service::{Event as LogEvent, LogAnalyzer};
-use tui::style::Color;
+use ratatui::style::Color;
 
 use std::sync::Arc;
 
@@ -1051,7 +1051,7 @@ impl App {
         }
     }
 
-    async fn handle_table_search_input(&mut self, key: KeyEvent){
+    async fn handle_table_search_input(&mut self, key: KeyEvent) {
         let multiplier = if key.modifiers == KeyModifiers::ALT {
             10
         } else {
@@ -1146,7 +1146,8 @@ impl App {
                 KeyCode::Char('r') => self.auto_scroll = !self.auto_scroll,
                 KeyCode::Enter => {
                     if let Some(current_line) = self.search_lines.get_selected_item() {
-                            self.log_lines.navigate_to(current_line.unformat().index.parse().unwrap());
+                        self.log_lines
+                            .navigate_to(current_line.unformat().index.parse().unwrap());
                     }
                 }
                 // Nothing

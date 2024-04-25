@@ -68,7 +68,7 @@ pub fn apply_filters(filters: &[LogFilter], mut log_line: LogLine) -> Option<Log
     }
 
     // There was including filters but we didnt match. Line not to be included
-    return None
+    return None;
 }
 
 #[cfg(test)]

@@ -1,4 +1,3 @@
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -13,7 +12,6 @@ use async_std::{
 use async_trait::async_trait;
 use flume::Sender;
 use parking_lot::RwLock;
-
 
 #[derive(Eq, PartialEq)]
 pub enum SourceType {
@@ -55,7 +53,7 @@ pub async fn create_source(
             true => Ok(Box::new(FileSource {
                 path: source_address,
                 read_lines: RwLock::new(0),
-                enabled: AtomicBool::new(true)
+                enabled: AtomicBool::new(true),
             })),
             false => Err(anyhow!(
                 "Could not open file.\nPlease ensure that path is correct"
@@ -63,7 +61,7 @@ pub async fn create_source(
         },
         SourceType::WS => Ok(Box::new(WsSource {
             address: source_address,
-            enabled: AtomicBool::new(true)
+            enabled: AtomicBool::new(true),
         })),
     }
 }
@@ -78,7 +76,7 @@ pub trait LogSource {
 pub struct FileSource {
     path: String,
     read_lines: RwLock<usize>,
-    enabled: AtomicBool
+    enabled: AtomicBool,
 }
 
 #[async_trait]
@@ -119,12 +117,11 @@ impl LogSource for FileSource {
     fn get_address(&self) -> String {
         self.path.clone()
     }
-
 }
 
 pub struct WsSource {
     address: String,
-    enabled: AtomicBool
+    enabled: AtomicBool,
 }
 
 #[async_trait]

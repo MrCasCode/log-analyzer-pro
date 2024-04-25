@@ -1,7 +1,7 @@
 pub mod app;
+pub mod data;
 pub mod styles;
 pub mod ui;
-pub mod data;
 
 use app::App;
 use crossterm::{
@@ -18,22 +18,22 @@ use log_analyzer::{
     },
 };
 
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    style::Color,
+    Frame, Terminal,
+};
 use std::{
     error::Error,
     fs, io,
     sync::Arc,
     time::{Duration, Instant},
 };
-use tui::{
-    backend::{Backend, CrosstermBackend},
-    Frame, Terminal, style::Color,
-};
 use ui::{
     ui_error_message::draw_error_popup, ui_filter_popup::draw_filter_popup,
     ui_loading_popup::draw_loading_popup, ui_log_analyzer::draw_log_analyzer_view,
     ui_navigation_popup::draw_navigation_popup, ui_source_popup::draw_source_popup,
 };
-
 
 pub async fn async_main(settings_path: Option<String>) -> Result<(), Box<dyn Error>> {
     // setup terminal
@@ -90,7 +90,6 @@ pub async fn async_main(settings_path: Option<String>) -> Result<(), Box<dyn Err
     }
     Ok(())
 }
-
 
 async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
@@ -152,7 +151,7 @@ async fn run_app<B: Backend>(
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn ui(f: &mut Frame, app: &mut App) {
     draw_log_analyzer_view(f, app);
 
     if app.show_source_popup {

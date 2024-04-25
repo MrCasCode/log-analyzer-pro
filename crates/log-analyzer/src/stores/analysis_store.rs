@@ -155,12 +155,7 @@ impl AnalysisStore for InMemmoryAnalysisStore {
 
 impl InMemmoryAnalysisStore {
     fn find_sorted_index(source: &[LogLine], index: usize) -> usize {
-        match source.binary_search_by(|e| {
-            e.index
-                .parse::<usize>()
-                .unwrap()
-                .cmp(&index)
-        }) {
+        match source.binary_search_by(|e| e.index.parse::<usize>().unwrap().cmp(&index)) {
             Ok(i) => i,
             Err(i) => i,
         }

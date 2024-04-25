@@ -1,6 +1,5 @@
 use crate::{app::App, styles::selected_style};
-use tui::{
-    backend::Backend,
+use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -8,10 +7,7 @@ use tui::{
 
 use super::ui_popup::centered_rect;
 
-fn draw_navigation_input<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_navigation_input(f: &mut Frame, app: &App, area: Rect) {
     let format_regex_widget = Paragraph::new("...")
         .style(selected_style(app.color))
         .block(Block::default().borders(Borders::ALL).title("Loading"));
@@ -19,10 +15,7 @@ where
     f.render_widget(format_regex_widget, area);
 }
 
-pub fn draw_loading_popup<B>(f: &mut Frame<B>, app: &mut App)
-where
-    B: Backend,
-{
+pub fn draw_loading_popup(f: &mut Frame, app: &mut App) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(selected_style(app.color));

@@ -1,9 +1,6 @@
-use tui::{backend::Backend, Frame, layout::Rect};
+use ratatui::{layout::Rect, Frame};
 
-pub fn display_cursor<B>(f: &mut Frame<B>, area: Rect, cursor: usize)
-where
-    B: Backend,
-{
+pub fn display_cursor(f: &mut Frame, area: Rect, cursor: usize) {
     // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
     f.set_cursor(
         // Put cursor past the end of the input text

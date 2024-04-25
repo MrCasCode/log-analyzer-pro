@@ -15,8 +15,8 @@ autotests = false
 edition = "2021"
 
 [dependencies]
-anyhow = { version = "1.0.53", features = ["backtrace"] }
-async-std = { version = "1.10.0", features = ["unstable"]}
-async-trait = "0.1.52"
-parking_lot = "0.12.0"
-flume = "0.10.12"
+anyhow = { version = "1.0.82", features = ["backtrace"] }
+async-std = { version = "1.12.0", features = ["unstable"]}
+async-trait = "0.1.80"
+parking_lot = "0.12.1"
+flume = "0.10.14"

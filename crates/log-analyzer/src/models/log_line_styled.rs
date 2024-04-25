@@ -63,7 +63,6 @@ impl LogLineStyled {
         ]
     }
 
-
     /// Return a copy of this line with unformatted content
     pub fn unformat(&self) -> LogLine {
         let unformat = |groups: &Vec<(Option<String>, String)>| {
@@ -170,7 +169,10 @@ impl<'a> IntoIterator for &'a &'a LogLineStyled {
 
 impl Ord for LogLineStyled {
     fn cmp(&self, other: &Self) -> Ordering {
-        match (self.unformat().index.parse::<usize>(), other.unformat().index.parse::<usize>()) {
+        match (
+            self.unformat().index.parse::<usize>(),
+            other.unformat().index.parse::<usize>(),
+        ) {
             (Ok(index), Ok(other)) => match (index, other) {
                 (index, other) if index < other => Ordering::Less,
                 (index, other) if index == other => Ordering::Equal,
@@ -183,7 +185,10 @@ impl Ord for LogLineStyled {
 
 impl PartialOrd for LogLineStyled {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self.unformat().index.parse::<usize>(), other.unformat().index.parse::<usize>()) {
+        match (
+            self.unformat().index.parse::<usize>(),
+            other.unformat().index.parse::<usize>(),
+        ) {
             (Ok(index), Ok(other)) => match (index, other) {
                 (index, other) if index < other => Some(Ordering::Less),
                 (index, other) if index == other => Some(Ordering::Equal),

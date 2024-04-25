@@ -1,24 +1,24 @@
-use tui::{widgets::{Paragraph, Block, Borders, Clear}, layout::{Alignment, Rect, Layout, Direction, Constraint}, backend::Backend, Frame};
+use ratatui::{
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    widgets::{Block, Borders, Clear, Paragraph},
+    Frame,
+};
 
-use crate::{styles::{selected_style, ERROR_STYLE}, app::App};
+use crate::{
+    app::App,
+    styles::{selected_style, ERROR_STYLE},
+};
 
 use super::ui_popup::centered_rect;
 
-
-fn draw_error_message<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_error_message(f: &mut Frame, app: &mut App, area: Rect) {
     let ok_button_widget = Paragraph::new(app.popup.message.as_str())
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(ok_button_widget, area);
 }
 
-fn draw_ok_button<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_ok_button(f: &mut Frame, app: &App, area: Rect) {
     let ok_button_widget = Paragraph::new("OK")
         .style(selected_style(app.color))
         .alignment(Alignment::Center)
@@ -26,10 +26,7 @@ where
     f.render_widget(ok_button_widget, area);
 }
 
-pub fn draw_error_popup<B>(f: &mut Frame<B>, app: &mut App)
-where
-    B: Backend,
-{
+pub fn draw_error_popup(f: &mut Frame, app: &mut App) {
     let block = Block::default()
         .title("Error")
         .borders(Borders::ALL)
@@ -46,16 +43,10 @@ where
         .split(area);
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage(80),
-                Constraint::Percentage(20)
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
         .margin(1)
         .split(popup_layout[0]);
 
-        draw_error_message(f, app, popup_layout[0]);
-        draw_ok_button(f, app, popup_layout[1]);
+    draw_error_message(f, app, popup_layout[0]);
+    draw_ok_button(f, app, popup_layout[1]);
 }

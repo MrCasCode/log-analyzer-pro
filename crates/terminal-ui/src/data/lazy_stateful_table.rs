@@ -1,4 +1,4 @@
-use tui::widgets::TableState;
+use ratatui::widgets::TableState;
 
 use super::Stateful;
 
@@ -7,7 +7,8 @@ const ROOM: usize = 100;
 
 pub trait LazySource<T> {
     fn source(&self, from: usize, to: usize) -> Vec<T>;
-    fn source_elements_containing(&self, element: usize, quantity: usize) -> (Vec<T>, usize, usize);
+    fn source_elements_containing(&self, element: usize, quantity: usize)
+        -> (Vec<T>, usize, usize);
 }
 
 enum Area {
@@ -20,7 +21,11 @@ impl Area {
     fn current_area(i: usize, elements: usize) -> Area {
         match i {
             i if i < ((elements / 2).overflowing_sub(ROOM).0) => Area::Below,
-            i if (((elements / 2).overflowing_sub(ROOM).0)..=(elements / 2 + ROOM)).contains(&i) => Area::Inside,
+            i if (((elements / 2).overflowing_sub(ROOM).0)..=(elements / 2 + ROOM))
+                .contains(&i) =>
+            {
+                Area::Inside
+            }
             i if i > (elements / 2 + ROOM) => Area::Above,
             _ => Area::Below,
         }
@@ -49,11 +54,14 @@ impl<T: Clone> LazyStatefulTable<T> {
         self.items = self.source.source(self.offset, CAPACITY);
 
         self.state.select(match self.state.selected() {
-            Some(i) => Some(i.min(if !self.items.is_empty() {self.items.len() - 1} else {0})),
+            Some(i) => Some(i.min(if !self.items.is_empty() {
+                self.items.len() - 1
+            } else {
+                0
+            })),
             _ => None,
         });
     }
-
 
     pub fn navigate_to(&mut self, element: usize) {
         let source = self.source.source_elements_containing(element, CAPACITY);
@@ -61,9 +69,7 @@ impl<T: Clone> LazyStatefulTable<T> {
         self.items = source.0;
         self.offset = source.1;
         self.state.select(Some(source.2));
-
     }
-
 
     pub fn navigate_to_bottom(&mut self) {
         let mut current = self.next();
@@ -74,10 +80,10 @@ impl<T: Clone> LazyStatefulTable<T> {
         }
     }
 
-    pub fn get_selected_item(&self) -> Option<T>{
+    pub fn get_selected_item(&self) -> Option<T> {
         match self.state.selected() {
             Some(i) => self.items.get(i).cloned(),
-            None => None
+            None => None,
         }
     }
 
@@ -94,7 +100,6 @@ impl<T: Clone> LazyStatefulTable<T> {
             self.state = std::mem::transmute::<(usize, Option<usize>), TableState>((index, None))
         }
     }
-
 }
 
 impl<T: Clone> Stateful<T> for LazyStatefulTable<T> {
@@ -176,10 +181,7 @@ impl<T: Clone> Stateful<T> for LazyStatefulTable<T> {
                                 .for_each(|(current, new_data)| *current = new_data);
                             self.offset -= received_elements;
 
-
                             self.select_and_set_scroll_on_top(selected);
-
-
                         }
                         selected
                     }

@@ -1,29 +1,23 @@
 use crate::{
     app::{
-        App, INDEX_FILTER_APP, INDEX_FILTER_BLUE_COLOR, INDEX_FILTER_DATETIME,
-        INDEX_FILTER_FUNCTION, INDEX_FILTER_GREEN_COLOR, INDEX_FILTER_NAME, INDEX_FILTER_OK_BUTTON,
-        INDEX_FILTER_PAYLOAD, INDEX_FILTER_RED_COLOR, INDEX_FILTER_SEVERITY,
-        INDEX_FILTER_TIMESTAMP, INDEX_FILTER_TYPE, parse_color, INDEX_FILTER_LOG,
+        parse_color, App, INDEX_FILTER_APP, INDEX_FILTER_BLUE_COLOR, INDEX_FILTER_DATETIME,
+        INDEX_FILTER_FUNCTION, INDEX_FILTER_GREEN_COLOR, INDEX_FILTER_LOG, INDEX_FILTER_NAME,
+        INDEX_FILTER_OK_BUTTON, INDEX_FILTER_PAYLOAD, INDEX_FILTER_RED_COLOR,
+        INDEX_FILTER_SEVERITY, INDEX_FILTER_TIMESTAMP, INDEX_FILTER_TYPE,
     },
     styles::selected_style,
 };
-use tui::{
-    backend::Backend,
-    layout::{Alignment, Layout, Rect, Constraint, Direction},
+use ratatui::{
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    text::{Span, Spans},
-    widgets::{
-        Block, Borders, Clear, Paragraph, Tabs,
-    },
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, Paragraph, Tabs},
     Frame,
 };
 
 use super::{ui_popup::centered_rect, ui_shared::display_cursor};
 
-fn draw_input_field<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize, title: &str)
-where
-    B: Backend,
-{
+fn draw_input_field(f: &mut Frame, app: &mut App, area: Rect, index: usize, title: &str) {
     let input_widget = Paragraph::new(app.input_buffers[index].value())
         .style(match index == app.input_buffer_index {
             false => Style::default(),
@@ -37,18 +31,10 @@ where
     }
 }
 
-fn draw_filter_type_selector<B>(
-    f: &mut Frame<B>,
-    app: &mut App,
-    area: Rect,
-    index: usize,
-    title: &str,
-) where
-    B: Backend,
-{
-    let titles = ["INCLUDE", "EXCLUDE", "MARKER"]
+fn draw_filter_type_selector(f: &mut Frame, app: &mut App, area: Rect, index: usize, title: &str) {
+    let titles: Vec<_> = ["INCLUDE", "EXCLUDE", "MARKER"]
         .iter()
-        .map(|t| Spans::from(vec![Span::styled(*t, Style::default().fg(Color::White))]))
+        .map(|t| Line::from(vec![Span::styled(*t, Style::default().fg(Color::White))]))
         .collect();
 
     let source_type_widget = Tabs::new(titles)
@@ -63,10 +49,7 @@ fn draw_filter_type_selector<B>(
     f.render_widget(source_type_widget, area);
 }
 
-fn draw_color_selector<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_color_selector(f: &mut Frame, app: &mut App, area: Rect) {
     let color_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -106,10 +89,7 @@ where
     f.render_widget(w_color, w.inner(color_layout[3]));
 }
 
-fn draw_separator<B>(f: &mut Frame<B>, title: &str, area: Rect, offset: &mut usize)
-where
-    B: Backend,
-{
+fn draw_separator(f: &mut Frame, title: &str, area: Rect, offset: &mut usize) {
     *offset += 1;
     f.render_widget(
         Block::default()
@@ -120,10 +100,7 @@ where
     );
 }
 
-fn draw_ok_button<B>(f: &mut Frame<B>, app: &App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_ok_button(f: &mut Frame, app: &App, area: Rect) {
     let ok_button_widget = Paragraph::new("OK")
         .style(match INDEX_FILTER_OK_BUTTON == app.input_buffer_index {
             false => Style::default(),
@@ -134,10 +111,7 @@ where
     f.render_widget(ok_button_widget, area);
 }
 
-pub fn draw_filter_popup<B>(f: &mut Frame<B>, app: &mut App)
-where
-    B: Backend,
-{
+pub fn draw_filter_popup(f: &mut Frame, app: &mut App) {
     let mut offset = 0_usize;
     let block = Block::default()
         .title("Filter")
@@ -176,13 +150,7 @@ where
         .margin(1)
         .split(popup_layout[0]);
 
-    draw_input_field(
-        f,
-        app,
-        popup_layout[0],
-        INDEX_FILTER_NAME,
-        "Name",
-    );
+    draw_input_field(f, app, popup_layout[0], INDEX_FILTER_NAME, "Name");
     draw_filter_type_selector(
         f,
         app,

@@ -1,9 +1,8 @@
 use log_analyzer::models::{log_line::LogLine, log_line_styled::LogLineStyled};
-use tui::{
-    backend::Backend,
+use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans, Text},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table},
     Frame,
 };
@@ -43,10 +42,7 @@ impl Convert<Color> for Color {
     }
 }
 
-fn draw_sources<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_sources(f: &mut Frame, app: &mut App, area: Rect) {
     let sources_widget = Block::default()
         .title("Sources")
         .borders(Borders::ALL)
@@ -80,22 +76,22 @@ where
         ];
         Row::new(cells).bottom_margin(0)
     });
-    let t = Table::new(rows)
-        .header(header)
-        .block(sources_widget)
-        .highlight_style(selected_style)
-        .widths(&[
+    let t = Table::new(
+        rows,
+        &[
             Constraint::Percentage(20),
             Constraint::Percentage(50),
             Constraint::Percentage(30),
-        ]);
+        ],
+    )
+    .header(header)
+    .block(sources_widget)
+    .highlight_style(selected_style);
+
     f.render_stateful_widget(t, area, &mut app.sources.state);
 }
 
-fn draw_filters<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_filters(f: &mut Frame, app: &mut App, area: Rect) {
     let filters_widget = Block::default()
         .title("Filters")
         .borders(Borders::ALL)
@@ -123,18 +119,18 @@ where
         ];
         Row::new(cells).bottom_margin(0)
     });
-    let t = Table::new(rows)
-        .header(header)
-        .block(filters_widget)
-        .highlight_style(selected_style)
-        .widths(&[Constraint::Percentage(20), Constraint::Percentage(80)]);
+    let t = Table::new(
+        rows,
+        &[Constraint::Percentage(20), Constraint::Percentage(80)],
+    )
+    .header(header)
+    .block(filters_widget)
+    .highlight_style(selected_style);
+
     f.render_stateful_widget(t, area, &mut app.filters.state);
 }
 
-fn draw_sidebar<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     let left_modules = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
@@ -165,14 +161,21 @@ fn log_line_cell_builder<'a>(line: &'a LogLine, column: &'a str, offset: usize) 
     ))
 }
 
-fn log_search_cell_builder<'a>(line: &'a LogLineStyled, column: &'a str, mut offset: usize) -> Cell<'a> {
+fn log_search_cell_builder<'a>(
+    line: &'a LogLineStyled,
+    column: &'a str,
+    mut offset: usize,
+) -> Cell<'a> {
     let groups = line.get(column).unwrap();
 
-    Cell::from(Spans::from(
+    Cell::from(Line::from(
         groups
             .into_iter()
             .filter_map(|(highlight, content)| {
-                let style = match (line.color.is_some(), highlight.as_ref().map(|c| Color::from_str(c))) {
+                let style = match (
+                    line.color.is_some(),
+                    highlight.as_ref().map(|c| Color::from_str(c)),
+                ) {
                     (_, Some(Some(color))) => {
                         Style::default().fg(color).add_modifier(Modifier::BOLD)
                     }
@@ -196,15 +199,7 @@ fn log_search_cell_builder<'a>(line: &'a LogLineStyled, column: &'a str, mut off
     ))
 }
 
-fn draw_log<'a, 's, B>(
-    f: &mut Frame<B>,
-    app: &'s mut App,
-    module: Module,
-    title: &str,
-    area: Rect,
-) where
-    B: Backend,
-{
+fn draw_log<'a, 's>(f: &mut Frame, app: &'s mut App, module: Module, title: &str, area: Rect) {
     let is_selected = app.selected_module == module;
     let items = &app.log_lines.items;
 
@@ -242,25 +237,16 @@ fn draw_log<'a, 's, B>(
         .map(|(name, _)| Constraint::Length(app.get_column_lenght(name)))
         .collect();
 
-    let t = Table::new(rows)
+    let t = Table::new(rows, &constraints)
         .header(header)
         .block(log_widget)
-        .highlight_style(selected_style)
-        .widths(&constraints);
+        .highlight_style(selected_style);
 
     let state = &mut app.log_lines.state;
     f.render_stateful_widget(t, area, state);
 }
 
-fn draw_search<'a, 's, B>(
-    f: &mut Frame<B>,
-    app: &'s mut App,
-    module: Module,
-    title: &str,
-    area: Rect,
-) where
-    B: Backend,
-{
+fn draw_search<'a, 's>(f: &mut Frame, app: &'s mut App, module: Module, title: &str, area: Rect) {
     let is_selected = app.selected_module == module;
     let items = &app.search_lines.items;
 
@@ -298,20 +284,16 @@ fn draw_search<'a, 's, B>(
         .map(|(name, _)| Constraint::Length(app.get_column_lenght(name)))
         .collect();
 
-    let t = Table::new(rows)
+    let t = Table::new(rows, &constraints)
         .header(header)
         .block(log_widget)
-        .highlight_style(selected_style)
-        .widths(&constraints);
+        .highlight_style(selected_style);
 
     let state = &mut app.search_lines.state;
     f.render_stateful_widget(t, area, state);
 }
 
-fn draw_search_box<B>(f: &mut Frame<B>, app: &mut App, area: Rect, index: usize, title: &str)
-where
-    B: Backend,
-{
+fn draw_search_box(f: &mut Frame, app: &mut App, area: Rect, index: usize, title: &str) {
     let input_widget = Paragraph::new(app.input_buffers[index].value())
         .style(match app.selected_module {
             Module::Search => selected_style(app.color),
@@ -326,10 +308,7 @@ where
     }
 }
 
-fn draw_bottom_bar<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_bottom_bar(f: &mut Frame, app: &mut App, area: Rect) {
     let bottom_bar_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -355,7 +334,13 @@ where
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL))
         .gauge_style(Style::default().fg(app.color))
-        .percent((if total > 0 { (filtered * 100 / total).min(100) } else { 0 }) as u16)
+        .percent(
+            (if total > 0 {
+                (filtered * 100 / total).min(100)
+            } else {
+                0
+            }) as u16,
+        )
         .label(label);
     f.render_widget(gauge, bottom_bar_layout[1]);
 
@@ -364,16 +349,19 @@ where
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL))
         .gauge_style(Style::default().fg(app.color))
-        .percent((if total > 0 { (searched * 100 / total).min(100) } else { 0 }) as u16)
+        .percent(
+            (if total > 0 {
+                (searched * 100 / total).min(100)
+            } else {
+                0
+            }) as u16,
+        )
         .label(label);
 
     f.render_widget(gauge, bottom_bar_layout[2]);
 }
 
-fn draw_main_panel<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_main_panel(f: &mut Frame, app: &mut App, area: Rect) {
     let expandable = area.height - 3;
     let log_lenght = expandable * (app.log_search_size_percentage) as u16 / 100;
     let search_lenght = expandable * (100 - app.log_search_size_percentage) as u16 / 100;
@@ -390,13 +378,7 @@ where
         )
         .split(area);
 
-    draw_log(
-        f,
-        app,
-        Module::Logs,
-        "Log",
-        main_modules[0],
-    );
+    draw_log(f, app, Module::Logs, "Log", main_modules[0]);
     draw_search_box(f, app, main_modules[1], INDEX_SEARCH, "Search");
     draw_search(
         f,
@@ -407,10 +389,7 @@ where
     );
 }
 
-pub fn draw_log_analyzer_view<B>(f: &mut Frame<B>, app: &mut App)
-where
-    B: Backend,
-{
+pub fn draw_log_analyzer_view(f: &mut Frame, app: &mut App) {
     let ui = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
