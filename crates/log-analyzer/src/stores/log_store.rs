@@ -11,7 +11,7 @@ pub trait LogStore {
     fn add_log(
         &self,
         log_id: &str,
-        log_source: Arc<Box<dyn LogSource + Send + Sync>>,
+        log_source: Arc<dyn LogSource + Send + Sync>,
         format: Option<&String>,
         enabled: bool,
     );
@@ -24,7 +24,7 @@ pub trait LogStore {
     /// Get a list of (enabled, log_id, format(if any))
     fn get_logs(&self) -> Vec<(bool, String, Option<String>)>;
     /// Get the log source associated to the log id
-    fn get_source(&self, id: &str) -> Option<Arc<Box<dyn LogSource + Send + Sync>>>;
+    fn get_source(&self, id: &str) -> Option<Arc<dyn LogSource + Send + Sync>>;
     /// Get a list of all the lines for the requested log. WARNING: clones
     fn get_lines(&self, log_id: &str) -> Vec<String>;
     /// Get a list of all the lines for the requested log. WARNING: moves
@@ -43,7 +43,7 @@ pub struct InMemmoryLogStore {
     /// K: log_path -> V: enabled
     enabled: RwLock<HashMap<String, bool>>,
     /// K: log_path -> V: source controller
-    source: RwLock<HashMap<String, Arc<Box<dyn LogSource + Send + Sync>>>>,
+    source: RwLock<HashMap<String, Arc<dyn LogSource + Send + Sync>>>,
 }
 
 impl InMemmoryLogStore {
@@ -67,7 +67,7 @@ impl LogStore for InMemmoryLogStore {
     fn add_log(
         &self,
         log_id: &str,
-        log_source: Arc<Box<dyn LogSource + Send + Sync>>,
+        log_source: Arc<dyn LogSource + Send + Sync>,
         format: Option<&String>,
         enabled: bool,
     ) {
@@ -151,7 +151,7 @@ impl LogStore for InMemmoryLogStore {
             .fold(0, |acc, (_, v)| acc + v.len())
     }
 
-    fn get_source(&self, id: &str) -> Option<Arc<Box<dyn LogSource + Send + Sync>>> {
+    fn get_source(&self, id: &str) -> Option<Arc<dyn LogSource + Send + Sync>> {
         if let Some((_id, source)) = self
             .source
             .read()

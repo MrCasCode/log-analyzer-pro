@@ -5,6 +5,7 @@ use log_analyzer::models::log_line_styled::LogLineStyled;
 use log_analyzer::models::{filter::Filter, log_line::LogLine};
 use log_analyzer::services::log_service::{Event as LogEvent, LogAnalyzer};
 use ratatui::style::Color;
+use ratatui_explorer::FileExplorer;
 
 use std::sync::Arc;
 
@@ -89,7 +90,7 @@ pub enum Module {
 }
 
 struct LogSourcer {
-    log_analyzer: Box<Arc<dyn LogAnalyzer>>,
+    log_analyzer: Arc<dyn LogAnalyzer>,
 }
 
 impl LazySource<LogLine> for LogSourcer {
@@ -106,7 +107,7 @@ impl LazySource<LogLine> for LogSourcer {
     }
 }
 struct SearchSourcer {
-    log_analyzer: Box<Arc<dyn LogAnalyzer>>,
+    log_analyzer: Arc<dyn LogAnalyzer>,
 }
 
 impl LazySource<LogLineStyled> for SearchSourcer {
@@ -129,7 +130,7 @@ impl LazySource<LogLineStyled> for SearchSourcer {
 /// and have access to features such as natural scrolling.
 pub struct App {
     /// Api to the backend processor
-    pub log_analyzer: Box<Arc<dyn LogAnalyzer>>,
+    pub log_analyzer: Arc<dyn LogAnalyzer>,
 
     /// Primary color
     pub color: Color,
@@ -155,6 +156,8 @@ pub struct App {
     pub input_buffer_index: usize,
     /// Stateful list of all the current formats to be displayed in the source popup
     pub formats: StatefulList<String>,
+    /// File explorer to select the source path
+    pub file_explorer: FileExplorer,
 
     /// Tab selector index for Source Type
     pub source_type: usize,
@@ -197,7 +200,7 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(log_analyzer: Box<Arc<dyn LogAnalyzer>>, primary_color: Color) -> App {
+    pub async fn new(log_analyzer: Arc<dyn LogAnalyzer>, primary_color: Color) -> App {
         let mut formats = vec!["New".to_string()];
         formats.extend(
             log_analyzer
@@ -234,8 +237,8 @@ impl App {
 
             input_buffers: vec![Input::default(); INDEX_MAX],
             input_buffer_index: 0,
-
             formats: StatefulList::with_items(formats),
+            file_explorer: FileExplorer::new().expect("Failed to create file explorer"),
 
             source_type: 0,
             filter_type: 0,
@@ -290,7 +293,19 @@ impl App {
             _ => Some(self.formats.items[selected_format_index].clone())
         };
 
-        let path = self.input_buffers[INDEX_SOURCE_PATH].value().to_string();
+        let path = match self.source_type {
+            0 => {
+                let selected = self.file_explorer.current();
+                if selected.is_dir() {
+                    return Err(anyhow::anyhow!("Selected path is a directory"));
+                }
+
+                selected.path().display().to_string()
+            }
+            1 => self.input_buffers[INDEX_SOURCE_PATH].value().to_string(),
+            _ => unreachable!(),
+        };
+
         self.log_analyzer
             .add_log(self.source_type, &path, alias.as_ref())?;
 
@@ -595,7 +610,7 @@ impl App {
                     .add_search(self.input_buffers[INDEX_SEARCH].value());
             }
             _ => {
-                input_backend::to_input_request(Event::Key(key))
+                input_backend::to_input_request(&Event::Key(key))
                     .map(|req| self.input_buffers[INDEX_SEARCH].handle(req));
             }
         }
@@ -657,10 +672,13 @@ impl App {
                 }
                 _ => {}
             },
+            index @ INDEX_SOURCE_PATH => {
+                self.file_explorer.handle(&Event::Key(key));
+            }
             index @ (INDEX_SOURCE_PATH
             | INDEX_SOURCE_NEW_FORMAT_ALIAS
             | INDEX_SOURCE_NEW_FORMAT_REGEX) => {
-                input_backend::to_input_request(Event::Key(key))
+                input_backend::to_input_request(&Event::Key(key))
                     .map(|req| self.input_buffers[index].handle(req));
             }
             INDEX_SOURCE_OK_BUTTON => {
@@ -670,6 +688,8 @@ impl App {
                             self.show_source_popup = false;
                             self.source_type = 0;
                             self.selected_module = Module::Sources;
+                            self.file_explorer =
+                                FileExplorer::new().expect("Failed to create file explorer");
                             self.update_sources().await;
                             self.input_buffers[INDEX_SOURCE_TYPE..INDEX_SOURCE_NEW_FORMAT_REGEX]
                                 .iter_mut()
@@ -712,7 +732,7 @@ impl App {
             | INDEX_FILTER_RED_COLOR
             | INDEX_FILTER_GREEN_COLOR
             | INDEX_FILTER_BLUE_COLOR) => {
-                input_backend::to_input_request(Event::Key(key))
+                input_backend::to_input_request(&Event::Key(key))
                     .map(|req| self.input_buffers[index].handle(req));
             }
             INDEX_FILTER_TYPE => {
@@ -812,7 +832,7 @@ impl App {
                 self.input_buffers[INDEX_NAVIGATION] = Input::default().with_value("".into());
             }
             _ => {
-                input_backend::to_input_request(Event::Key(key))
+                input_backend::to_input_request(&Event::Key(key))
                     .map(|req| self.input_buffers[INDEX_NAVIGATION].handle(req));
             }
         }

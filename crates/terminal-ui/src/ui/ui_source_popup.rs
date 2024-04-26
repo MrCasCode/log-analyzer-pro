@@ -12,6 +12,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs},
     Frame,
 };
+use ratatui_explorer::FileExplorer;
 
 use super::{ui_popup::centered_rect, ui_shared::display_cursor};
 
@@ -34,16 +35,22 @@ fn draw_source_type_selector(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_source_path(f: &mut Frame, app: &App, area: Rect) {
-    let source_path_widget = Paragraph::new(app.input_buffers[INDEX_SOURCE_PATH].value())
-        .style(match INDEX_SOURCE_PATH == app.input_buffer_index {
-            false => Style::default(),
-            true => selected_style(app.color),
-        })
-        .block(Block::default().borders(Borders::ALL).title("Path"));
+    match app.source_type {
+        0 => f.render_widget(&app.file_explorer.widget(), area),
+        1 => {
+            let source_path_widget = Paragraph::new(app.input_buffers[INDEX_SOURCE_PATH].value())
+                .style(match INDEX_SOURCE_PATH == app.input_buffer_index {
+                    false => Style::default(),
+                    true => selected_style(app.color),
+                })
+                .block(Block::default().borders(Borders::ALL).title("Url"));
 
-    f.render_widget(source_path_widget, area);
-    if INDEX_SOURCE_PATH == app.input_buffer_index {
-        display_cursor(f, area, app.input_buffers[INDEX_SOURCE_PATH].cursor())
+            f.render_widget(source_path_widget, area);
+            if INDEX_SOURCE_PATH == app.input_buffer_index {
+                display_cursor(f, area, app.input_buffers[INDEX_SOURCE_PATH].cursor())
+            }
+        }
+        _ => unreachable!("Invalid source type selected"),
     }
 }
 
@@ -134,30 +141,31 @@ pub fn draw_source_popup(f: &mut Frame, app: &mut App) {
         .borders(Borders::ALL)
         .border_style(selected_style(app.color));
 
-    let area = centered_rect(60, 28, f.size());
+    let area = centered_rect(60, 50, f.size());
     f.render_widget(Clear, area); //this clears out the background
     f.render_widget(block, area);
 
-    let popup_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(100)].as_ref())
-        .margin(1)
-        .split(area);
+    let source_constraint = match app.source_type {
+        0 => Constraint::Percentage(40),
+        1 => Constraint::Max(3),
+        _ => unreachable!("Invalid source type selected"),
+    };
+
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
             [
                 Constraint::Max(3),
+                source_constraint,
+                Constraint::Percentage(30),
                 Constraint::Max(3),
-                Constraint::Percentage(40),
                 Constraint::Max(3),
                 Constraint::Max(3),
-                Constraint::Max(1),
             ]
             .as_ref(),
         )
-        .margin(1)
-        .split(popup_layout[0]);
+        .margin(2)
+        .split(area);
 
     draw_source_type_selector(f, app, popup_layout[INDEX_SOURCE_TYPE]);
     draw_source_path(f, app, popup_layout[INDEX_SOURCE_PATH]);

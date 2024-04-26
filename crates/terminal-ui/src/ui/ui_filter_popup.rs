@@ -123,11 +123,6 @@ pub fn draw_filter_popup(f: &mut Frame, app: &mut App) {
     f.render_widget(block, area);
 
     let popup_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(100)].as_ref())
-        .margin(1)
-        .split(area);
-    let popup_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
             [
@@ -143,12 +138,12 @@ pub fn draw_filter_popup(f: &mut Frame, app: &mut App) {
                 Constraint::Max(3), // Filter input
                 Constraint::Max(1), // Separator
                 Constraint::Max(3), // Color
-                Constraint::Max(2), // Ok
+                Constraint::Max(3), // Ok
             ]
             .as_ref(),
         )
-        .margin(1)
-        .split(popup_layout[0]);
+        .margin(2)
+        .split(area);
 
     draw_input_field(f, app, popup_layout[0], INDEX_FILTER_NAME, "Name");
     draw_filter_type_selector(

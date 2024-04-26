@@ -29,13 +29,6 @@ Use <kbd>Shift</kbd> + <kbd>Arrows</kbd> or <kbd>⇥ Tab</kbd> to navigate acros
 
 ### Inner navigation
 When focused on a tab, list or table, use the <kbd>Arrows</kbd> to change the selection
-* Left: <kbd>⇧ Shift</kbd> + <kbd>←</kbd>
-* Right: <kbd>⇧ Shift</kbd> + <kbd>→</kbd>
-* Up: <kbd>⇧ Shift</kbd> + <kbd>↑</kbd>
-* Down: <kbd>⇧ Shift</kbd> + <kbd>↓</kbd>
-
-### Inner navigation
-When focused on a tab, list or table, use the <kbd>Arrows</kbd> to change the selection
 * Left: <kbd>←</kbd>
 * Right: <kbd>→</kbd>
 * Up: <kbd>↑</kbd>
@@ -57,7 +50,7 @@ When focused on a tab, list or table, use the <kbd>Arrows</kbd> to change the se
 * Edit selected filter: <kbd>e</kbd>
 
 ### Log & Search results module
-*
+
 * Use `inner navigation` to navigate through the logs and apply horizontal scroll
 * Press <kbd>⌥ Option</kbd> or <kbd>Alt</kbd> + `inner navigation` for rapid scroll
 * Press <kbd>Page Up</kbd> or <kbd>Page Down</kbd> to paginate 1000 lines

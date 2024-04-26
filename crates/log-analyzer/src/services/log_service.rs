@@ -255,7 +255,7 @@ impl LogService {
     }
 
     /// Helper function to run log sources
-    fn run_log_source(&self, log_source: Arc<Box<dyn LogSource + Send + Sync>>) {
+    fn run_log_source(&self, log_source: Arc<dyn LogSource + Send + Sync>) {
         let sender = self.log_sender.clone();
 
         std::thread::Builder::new()
@@ -280,10 +280,10 @@ impl LogAnalyzer for LogService {
 
         let source_type = SourceType::try_from(source_type).unwrap();
 
-        let log_source = Arc::new(async_std::task::block_on(create_source(
-            source_type,
-            source_address.to_string(),
-        ))?);
+        let log_source: Arc<dyn LogSource + Send + Sync> = Arc::from(async_std::task::block_on(
+            create_source(source_type, source_address.to_string()),
+        )?);
+
         log_store.add_log(source_address, log_source.clone(), format, true);
         self.run_log_source(log_source);
 

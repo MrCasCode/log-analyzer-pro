@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use log_analyzer::models::{log_line::LogLine, log_line_styled::LogLineStyled};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -58,20 +60,20 @@ fn draw_sources(f: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::Black)));
     let header = Row::new(header_cells).style(normal_style).bottom_margin(1);
-    let rows = app.sources.items.iter().map(|item| {
+    let rows = app.sources.items.iter().map(|(enabled, log, format)| {
         let get_enabled_widget = |enabled: bool| match enabled {
             true => Span::styled("V", Style::default().fg(app.color)),
             false => Span::styled("X", Style::default().fg(Color::Gray)),
         };
 
-        let format = match &item.2 {
+        let format = match format {
             Some(format) => format.as_str(),
             _ => "",
         };
 
         let cells = vec![
-            Cell::from(get_enabled_widget(item.0)),
-            Cell::from(Text::from(item.1.as_str())),
+            Cell::from(get_enabled_widget(*enabled)),
+            Cell::from(Text::from(log.as_str())),
             Cell::from(Text::from(format)),
         ];
         Row::new(cells).bottom_margin(0)
