@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
-/// This struct contains a formated log with its info clasified
+/// This struct contains a formatted log with its info classified
 /// in several fields
 pub struct LogLine {
     pub log: String,

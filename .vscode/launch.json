@@ -7,35 +7,35 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'log_analyzer_pro_service'",
+            "name": "Debug executable 'lap'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=log_analyzer_pro_service",
-                    "--package=log_analyzer_pro_service"
+                    "--bin=lap",
                 ],
                 "filter": {
-                    "name": "log_analyzer_pro_service",
+                    "name": "lap",
                     "kind": "bin"
                 }
             },
-            //"args": ["/Users/mario/dev/00-rust/log-analyzer-pro/src/filecopy.txt"],
-            "args": ["/Users/mario/dev/crypto-spreads/python/src/utils/execution-1.31-14.25.25-.log"],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--settings",
+                "${workspaceFolder}/settings.json"
+            ]
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'log_analyzer_pro_service'",
+            "name": "Debug unit tests in executable 'lap'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=log_analyzer_pro_service",
-                    "--package=log_analyzer_pro_service"
+                    "--bin=lap",
                 ],
                 "filter": {
-                    "name": "log_analyzer_pro_service",
+                    "name": "lap",
                     "kind": "bin"
                 }
             },
